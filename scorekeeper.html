@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B3D34">
+<meta name="robots" content="noindex, nofollow">
+<title>Scorekeeper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0B3D34;
+    --navy-dark:#062822;
+    --gold:#E8749E;
+    --bg:#FBF1F5;
+    --card:#FFFFFF;
+    --ink:#1B2B26;
+    --sub:#6E7D77;
+    --line:#EADBE0;
+    --win:#1D9A8C;
+    --loss:#C23B6B;
+    --pending:#A79AA0;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased; padding-bottom:calc(60px + env(safe-area-inset-bottom));
+    overflow-x:hidden;
+  }
+  h1,h2,h3,.num{font-family:'Oswald',sans-serif;}
+  header{
+    background:var(--navy); color:#fff; padding:calc(16px + env(safe-area-inset-top)) 18px 16px 18px;
+    position:sticky; top:0; z-index:20;
+  }
+  header h1{ margin:0; font-size:19px; font-weight:600; }
+  header .sub{ margin:4px 0 0 0; font-size:12px; color:#CBA9B2; }
+  main{ padding:16px; max-width:720px; margin:0 auto; }
+
+  .status-banner{
+    border-radius:10px; padding:14px 16px; margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  }
+  .status-banner.pending{ background:#FCEFD9; border:1px solid #D9A441; }
+  .status-banner.complete{ background:#E1F5F1; border:1px solid var(--win); }
+  .status-text{ flex:1; min-width:180px; font-size:13px; line-height:1.4; }
+  .status-text strong{ display:block; font-family:'Oswald'; font-size:15px; margin-bottom:2px; }
+  .btn{
+    border:none; border-radius:8px; padding:11px 16px; font-family:'Oswald'; font-size:14px;
+    cursor:pointer; white-space:nowrap;
+  }
+  .btn-primary{ background:var(--navy); color:#fff; }
+  .btn-danger{ background:none; border:1px solid var(--loss); color:var(--loss); }
+  .btn-secondary{ background:none; border:1px solid var(--sub); color:var(--sub); font-size:12px; padding:8px 12px; }
+
+  .section-label{ font-family:'Oswald'; font-size:13px; text-transform:uppercase; letter-spacing:0.6px; color:var(--sub); margin:20px 0 8px 4px; }
+  .section-label:first-child{ margin-top:0; }
+
+  .court-card{ background:var(--card); border-radius:10px; margin-bottom:14px; overflow:hidden; border:1px solid var(--line); }
+  .court-head{ background:var(--navy); color:#fff; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; }
+  .court-head .pool-name{ font-family:'Oswald'; font-size:15px; }
+  .court-head .court-tag{ font-size:10px; font-weight:700; }
+
+  .match-row{ padding:12px 14px; border-bottom:1px solid var(--line); }
+  .match-row:last-child{ border-bottom:none; }
+  .match-teams{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:14px; font-weight:600; flex-wrap:wrap; gap:4px; }
+  .match-teams .vs{ color:var(--sub); font-weight:400; font-size:12px; padding:0 6px; }
+  .result-tag{ font-size:11px; font-weight:600; padding:3px 8px; border-radius:6px; margin-left:8px; }
+  .result-tag.win{ background:#E1F5F1; color:var(--win); }
+  .result-tag.pending{ background:#EEF0F0; color:var(--pending); }
+  .result-tag.live{ background:#FCE9E9; color:#C0392B; animation:pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.55; } }
+  .set-inputs{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .set-input-pair{ display:flex; align-items:center; gap:4px; background:var(--bg); border-radius:8px; padding:6px 8px; }
+  .set-input-pair input{ width:38px; border:none; background:none; text-align:center; font-family:'Oswald'; font-size:16px; color:var(--ink); padding:4px 0; }
+  .set-input-pair span{ color:var(--sub); font-size:12px; }
+  .set-label{ font-size:10px; color:var(--sub); text-transform:uppercase; letter-spacing:0.3px; margin-right:2px; }
+  .live-toggle{ background:var(--navy); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-size:11px; font-family:'Inter'; cursor:pointer; margin-left:auto; }
+  .live-toggle.active{ background:#C0392B; }
+  .bye-row{ padding:12px 14px; color:var(--sub); font-style:italic; font-size:13px; }
+
+  .empty-note{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px; text-align:center; color:var(--sub); font-size:13.5px; line-height:1.5; }
+  .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; }
+  .dot.purple{ background:#5B2C8F; }
+  .dot.teal{ background:#2A9D93; }
+  .bracket-group-head{ display:flex; align-items:center; gap:2px; margin:20px 0 8px 4px; }
+  .bracket-group-head h2{ font-size:16px; margin:0; }
+
+  .footer-actions{ margin-top:28px; padding-top:16px; border-top:1px solid var(--line); display:flex; justify-content:center; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Scorekeeper</h1>
+  <div class="sub">Sophie Montez Memorial Volleyball Tournament &mdash; entries here update the public site automatically. Don\u2019t share this link publicly.</div>
+</header>
+
+<main>
+  <div id="status-banner"></div>
+  <div class="section-label">Pool Play</div>
+  <div id="pool-section"></div>
+  <div class="section-label">Bracket Play</div>
+  <div id="bracket-section"></div>
+  <div class="footer-actions">
+    <button class="btn btn-danger" id="resetBtn">Reset entire tournament</button>
+  </div>
+</main>
+
+<script>
+// ---------- DATA MODEL (mirrors the public page) ----------
+const POOLS = [
+  { key:'A', court:1, teams:['Estacada','South Umpqua','Banks','Gladstone'] },
+  { key:'B', court:2, teams:['Scappoose','Madras','Philomath','La Pine'] },
+  { key:'C', court:3, teams:['Ontario','Junction City','Molalla','Astoria'] }
+];
+const ROUND_PATTERN = [[0,3],[1,2],[0,2],[1,3],[0,1],[2,3]];
+const COURT_NAMES = { 1:'EHS Main Gym', 2:'EHS Aux Gym', 3:'River Mill Gym' };
+const COURT_COLORS = { 1:'#E8749E', 2:'#1D9A8C', 3:'#8B5FBF' };
+function courtLabel(n){
+  return '<span style="color:'+COURT_COLORS[n]+'">'+COURT_NAMES[n].toUpperCase()+'</span>';
+}
+
+let state = {
+  poolPlayComplete:false,
+  matches:{},
+  bracketMatches:{ gold:{}, silver:{} }
+};
+
+function matchKey(pool,round){ return pool+'-r'+round; }
+function ensureMatch(pool,round){
+  const k = matchKey(pool,round);
+  if(!state.matches[k]) state.matches[k] = { sets:[{a:null,b:null}], live:false };
+  return state.matches[k];
+}
+function ensureBracketMatch(bKey, slotKey){
+  if(!state.bracketMatches[bKey]) state.bracketMatches[bKey] = {};
+  if(!state.bracketMatches[bKey][slotKey]) state.bracketMatches[bKey][slotKey] = { sets:[{a:null,b:null}], live:false };
+  return state.bracketMatches[bKey][slotKey];
+}
+
+function computeMatchResult(m, teamA, teamB){
+  let setsA=0,setsB=0,ptsA=0,ptsB=0,played=false;
+  (m.sets||[]).forEach(s=>{
+    if(s.a!=null && s.b!=null && !isNaN(s.a) && !isNaN(s.b) && (s.a>0||s.b>0)){
+      played=true;
+      ptsA+=Number(s.a); ptsB+=Number(s.b);
+      if(s.a>s.b) setsA++; else if(s.b>s.a) setsB++;
+    }
+  });
+  let winner=null;
+  if(setsA>setsB) winner=teamA; else if(setsB>setsA) winner=teamB;
+  return { setsA,setsB,ptsA,ptsB,winner,played: winner!==null };
+}
+function scoreLineText(m){
+  return (m.sets||[])
+    .filter(s=> s.a!=null && s.b!=null && !isNaN(s.a) && !isNaN(s.b) && (s.a>0||s.b>0))
+    .map(s=> s.a+'-'+s.b)
+    .join(', ');
+}
+
+function poolStandings(pool){
+  const stats = {};
+  pool.teams.forEach(t=> stats[t] = { team:t, wins:0, losses:0, setsW:0, setsL:0, ptsW:0, ptsL:0, h2h:{} });
+  ROUND_PATTERN.forEach((pair, idx)=>{
+    const round = idx+1;
+    const teamA = pool.teams[pair[0]], teamB = pool.teams[pair[1]];
+    const m = ensureMatch(pool.key, round);
+    const r = computeMatchResult(m, teamA, teamB);
+    stats[teamA].setsW += r.setsA; stats[teamA].setsL += r.setsB;
+    stats[teamA].ptsW += r.ptsA; stats[teamA].ptsL += r.ptsB;
+    stats[teamB].setsW += r.setsB; stats[teamB].setsL += r.setsA;
+    stats[teamB].ptsW += r.ptsB; stats[teamB].ptsL += r.ptsA;
+    if(r.played){
+      if(r.winner===teamA){ stats[teamA].wins++; stats[teamB].losses++; stats[teamA].h2h[teamB]='W'; stats[teamB].h2h[teamA]='L'; }
+      else { stats[teamB].wins++; stats[teamA].losses++; stats[teamB].h2h[teamA]='W'; stats[teamA].h2h[teamB]='L'; }
+    }
+  });
+  const arr = Object.values(stats).map(s=>({
+    ...s,
+    setPct: (s.setsW+s.setsL)>0 ? s.setsW/(s.setsW+s.setsL) : 0,
+    ptPct: (s.ptsW+s.ptsL)>0 ? s.ptsW/(s.ptsW+s.ptsL) : 0
+  }));
+  arr.sort((a,b)=> b.wins-a.wins || b.setPct-a.setPct || b.ptPct-a.ptPct);
+  for(let i=0;i<arr.length-1;i++){
+    let j=i;
+    while(j+1<arr.length && arr[j+1].wins===arr[i].wins) j++;
+    if(j===i+1){
+      const a=arr[i], b=arr[j];
+      if(a.h2h[b.team]==='L' && b.h2h[a.team]==='W'){ arr[i]=b; arr[j]=a; }
+    }
+  }
+  arr.forEach((s,i)=> s.rank = i+1);
+  const complete = ROUND_PATTERN.every((pair,idx)=> computeMatchResult(ensureMatch(pool.key, idx+1), pool.teams[pair[0]], pool.teams[pair[1]]).played);
+  return { standings: arr, complete };
+}
+
+function getBracketSeeds(){
+  const results = POOLS.map(p=> ({ pool:p.key, ...poolStandings(p) }));
+  const rankGroup = (rankNum)=> results.map(r=> r.standings.find(s=>s.rank===rankNum));
+  const sortGroup = (group)=> group.slice().sort((a,b)=> b.wins-a.wins || b.setPct-a.setPct || b.ptPct-a.ptPct);
+  const goldTop = sortGroup(rankGroup(1));
+  const goldMid = sortGroup(rankGroup(2));
+  const silverTop = sortGroup(rankGroup(3));
+  const silverMid = sortGroup(rankGroup(4));
+  const gold = [...goldTop, ...goldMid].map((s,i)=> ({ seed:i+1, team:s.team }));
+  const silver = [...silverTop, ...silverMid].map((s,i)=> ({ seed:i+1, team:s.team }));
+  return { gold, silver };
+}
+
+function bracketStructure(seeds, bm){
+  const bySeed = n => seeds.find(s=>s.seed===n)?.team || null;
+  const qfA_x = bySeed(4), qfA_y = bySeed(5);
+  const qfB_x = bySeed(3), qfB_y = bySeed(6);
+  const qfA_m = ensureBracketMatchIn(bm, 'qfA'), qfB_m = ensureBracketMatchIn(bm, 'qfB');
+  const qfA_res = computeMatchResult(qfA_m, qfA_x, qfA_y);
+  const qfB_res = computeMatchResult(qfB_m, qfB_x, qfB_y);
+
+  const sf1_x = bySeed(1), sf1_y = qfA_res.winner;
+  const sf2_x = bySeed(2), sf2_y = qfB_res.winner;
+  const sf1_m = ensureBracketMatchIn(bm, 'sf1'), sf2_m = ensureBracketMatchIn(bm, 'sf2');
+  const sf1_res = computeMatchResult(sf1_m, sf1_x, sf1_y);
+  const sf2_res = computeMatchResult(sf2_m, sf2_x, sf2_y);
+
+  const final_m = ensureBracketMatchIn(bm, 'final');
+  const final_res = computeMatchResult(final_m, sf1_res.winner, sf2_res.winner);
+
+  return {
+    qfA:{ x:qfA_x, y:qfA_y, xSeed:4, ySeed:5, winner:qfA_res.winner, played:qfA_res.played, m:qfA_m },
+    qfB:{ x:qfB_x, y:qfB_y, xSeed:3, ySeed:6, winner:qfB_res.winner, played:qfB_res.played, m:qfB_m },
+    sf1:{ x:sf1_x, y:sf1_y, xSeed:1, ySeed:null, winner:sf1_res.winner, played:sf1_res.played, m:sf1_m },
+    sf2:{ x:sf2_x, y:sf2_y, xSeed:2, ySeed:null, winner:sf2_res.winner, played:sf2_res.played, m:sf2_m },
+    final:{ x:sf1_res.winner, y:sf2_res.winner, winner:final_res.winner, played:final_res.played, m:final_m }
+  };
+}
+function ensureBracketMatchIn(bm, slotKey){
+  if(!bm[slotKey]) bm[slotKey] = { sets:[{a:null,b:null}], live:false };
+  return bm[slotKey];
+}
+
+// ---------- PERSISTENCE ----------
+let lastSnapshot = null;
+async function loadState(){
+  try{
+    const res = await window.storage.get('tournament-data', true);
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      if(parsed.matches) state.matches = parsed.matches;
+      if(parsed.bracketMatches) state.bracketMatches = parsed.bracketMatches;
+      if(typeof parsed.poolPlayComplete === 'boolean') state.poolPlayComplete = parsed.poolPlayComplete;
+      lastSnapshot = res.value;
+    }
+  }catch(e){ /* nothing saved yet */ }
+}
+let saveTimer=null;
+function saveData(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    const payload = JSON.stringify({ matches:state.matches, bracketMatches:state.bracketMatches, poolPlayComplete:state.poolPlayComplete });
+    lastSnapshot = payload;
+    try{ await window.storage.set('tournament-data', payload, true); }
+    catch(e){ console.error('save failed', e); }
+  }, 150);
+}
+// Poll for changes from other scorekeeper devices, but never while this device has an
+// input focused (so we don't clobber someone actively typing a score).
+function startPolling(){
+  setInterval(async ()=>{
+    const active = document.activeElement;
+    if(active && (active.tagName==='INPUT')) return;
+    try{
+      const res = await window.storage.get('tournament-data', true);
+      if(res && res.value && res.value !== lastSnapshot){
+        lastSnapshot = res.value;
+        const parsed = JSON.parse(res.value);
+        if(parsed.matches) state.matches = parsed.matches;
+        if(parsed.bracketMatches) state.bracketMatches = parsed.bracketMatches;
+        if(typeof parsed.poolPlayComplete === 'boolean') state.poolPlayComplete = parsed.poolPlayComplete;
+        renderAll();
+      }
+    }catch(e){ /* skip this tick */ }
+  }, 10000);
+}
+
+// ---------- RENDER: a single editable match row (shared by pool & bracket) ----------
+function matchRowHtml(teamA, teamB, m, dataAttrs){
+  if(teamA===null || teamB===null) return '';
+  const r = computeMatchResult(m, teamA, teamB);
+  let html = '<div class="match-row">';
+  html += '<div class="match-teams"><span>'+teamA+'</span><span class="vs">vs</span><span>'+teamB+'</span>';
+  if(r.played){
+    const tag = r.winner===teamA ? teamA+' won' : teamB+' won';
+    html += '<span class="result-tag win">'+tag+'</span>';
+  } else if(m.live){
+    html += '<span class="result-tag live">LIVE</span>';
+  } else {
+    html += '<span class="result-tag pending">Not played</span>';
+  }
+  html += '</div>';
+  html += '<div class="set-inputs">';
+  (m.sets||[]).forEach((s,si)=>{
+    html += '<div class="set-input-pair"><span class="set-label">S'+(si+1)+'</span>'+
+      '<input type="number" min="0" max="99" inputmode="numeric" pattern="[0-9]*" '+dataAttrs+' data-set="'+si+'" data-side="a" value="'+(s.a??'')+'">'+
+      '<span>-</span>'+
+      '<input type="number" min="0" max="99" inputmode="numeric" pattern="[0-9]*" '+dataAttrs+' data-set="'+si+'" data-side="b" value="'+(s.b??'')+'">'+
+      '</div>';
+  });
+  html += '<div class="set-input-pair" style="cursor:pointer;" '+dataAttrs.replace('data-target','data-add-set-target')+'><span style="color:var(--sub);font-size:12px;">+ set</span></div>';
+  html += '<button class="live-toggle'+(m.live?' active':'')+'" '+dataAttrs.replace('data-target','data-live-target')+'>'+(m.live?'Unmark live':'Mark live')+'</button>';
+  html += '</div></div>';
+  return html;
+}
+
+// ---------- RENDER: POOL SECTION ----------
+function renderPoolSection(){
+  let html = '';
+  POOLS.forEach(pool=>{
+    html += '<div class="court-card"><div class="court-head"><span class="pool-name">Pool '+pool.key+'</span><span class="court-tag">'+courtLabel(pool.court)+'</span></div>';
+    ROUND_PATTERN.forEach((pair, idx)=>{
+      const round = idx+1;
+      const teamA = pool.teams[pair[0]], teamB = pool.teams[pair[1]];
+      const m = ensureMatch(pool.key, round);
+      const dataAttrs = 'data-target="pool" data-pool="'+pool.key+'" data-round="'+round+'"';
+      html += matchRowHtml(teamA, teamB, m, dataAttrs);
+    });
+    html += '</div>';
+  });
+  document.getElementById('pool-section').innerHTML = html;
+}
+
+// ---------- RENDER: STATUS BANNER + BRACKET SECTION ----------
+function renderStatusAndBracket(){
+  const allPlayed = POOLS.every(p=> poolStandings(p).complete);
+  const banner = document.getElementById('status-banner');
+  if(!state.poolPlayComplete){
+    banner.innerHTML = '<div class="status-banner pending">'+
+      '<div class="status-text"><strong>Pool play in progress</strong>'+
+      (allPlayed ? 'All pool matches have a result. Ready to move to bracket play.' : 'Enter scores for all pool matches, then complete pool play to unlock the bracket.')+
+      '</div>'+
+      '<button class="btn btn-primary" id="completePoolBtn">Complete Pool Play &rarr;</button>'+
+      '</div>';
+  } else {
+    banner.innerHTML = '<div class="status-banner complete">'+
+      '<div class="status-text"><strong>Pool play complete</strong>Bracket seeding is locked in below. Reopen pool play only to fix a mistake.</div>'+
+      '<button class="btn btn-secondary" id="reopenPoolBtn">Reopen pool play</button>'+
+      '</div>';
+  }
+
+  const bracketEl = document.getElementById('bracket-section');
+  if(!state.poolPlayComplete){
+    bracketEl.innerHTML = '<div class="empty-note">Bracket entry unlocks once you complete pool play above.</div>';
+    return;
+  }
+  const { gold, silver } = getBracketSeeds();
+  let html = '';
+  html += bracketGroupHtml('Purple Bracket', 'purple', 'gold', gold, state.bracketMatches.gold);
+  html += bracketGroupHtml('Teal Bracket', 'teal', 'silver', silver, state.bracketMatches.silver);
+  bracketEl.innerHTML = html;
+}
+
+function bracketGroupHtml(label, dotClass, bKey, seeds, bm){
+  const st = bracketStructure(seeds, bm);
+  let html = '<div class="bracket-group-head"><span class="dot '+dotClass+'"></span><h2>'+label+'</h2></div><div class="court-card">';
+  const row = (slotKey, x, y, m)=>{
+    if(x===null && y===null) return '';
+    if(y===null && x!==null){
+      const msg = (slotKey==='final')
+        ? x+' has advanced &mdash; waiting on the other semifinal to be decided.'
+        : x+' has the bye into this round &mdash; waiting on the quarterfinal winner.';
+      return '<div class="bye-row">'+msg+'</div>';
+    }
+    if(x===null || y===null) return '<div class="bye-row">Waiting on previous round&hellip;</div>';
+    const dataAttrs = 'data-target="bracket" data-bkey="'+bKey+'" data-slot="'+slotKey+'"';
+    return matchRowHtml(x, y, m, dataAttrs);
+  };
+  html += row('qfA', st.qfA.x, st.qfA.y, st.qfA.m);
+  html += row('qfB', st.qfB.x, st.qfB.y, st.qfB.m);
+  html += row('sf1', st.sf1.x, st.sf1.y, st.sf1.m);
+  html += row('sf2', st.sf2.x, st.sf2.y, st.sf2.m);
+  html += row('final', st.final.x, st.final.y, st.final.m);
+  html += '</div>';
+  return html;
+}
+
+function renderAll(){
+  renderPoolSection();
+  renderStatusAndBracket();
+}
+
+// ---------- EVENTS ----------
+document.addEventListener('input', (e)=>{
+  const t = e.target;
+  if(t.matches('input[data-target="pool"]')){
+    const { pool, round, set, side } = t.dataset;
+    const m = ensureMatch(pool, Number(round));
+    m.sets[Number(set)][side] = t.value === '' ? null : Number(t.value);
+    saveData();
+    renderPoolSection();
+    renderStatusAndBracket();
+    // restore focus so typing isn't interrupted by the re-render
+    const sel = 'input[data-target="pool"][data-pool="'+pool+'"][data-round="'+round+'"][data-set="'+set+'"][data-side="'+side+'"]';
+    const el = document.querySelector(sel);
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  }
+  if(t.matches('input[data-target="bracket"]')){
+    const { bkey, slot, set, side } = t.dataset;
+    const m = ensureBracketMatch(bkey, slot);
+    m.sets[Number(set)][side] = t.value === '' ? null : Number(t.value);
+    saveData();
+    renderStatusAndBracket();
+    const sel = 'input[data-target="bracket"][data-bkey="'+bkey+'"][data-slot="'+slot+'"][data-set="'+set+'"][data-side="'+side+'"]';
+    const el = document.querySelector(sel);
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  }
+});
+
+document.addEventListener('click', (e)=>{
+  // add set (pool)
+  const addPool = e.target.closest('[data-add-set-target="pool"]');
+  if(addPool){
+    const { pool, round } = addPool.dataset;
+    const m = ensureMatch(pool, Number(round));
+    if(m.sets.length<5) m.sets.push({a:null,b:null});
+    saveData();
+    renderPoolSection();
+    return;
+  }
+  // add set (bracket)
+  const addBracket = e.target.closest('[data-add-set-target="bracket"]');
+  if(addBracket){
+    const { bkey, slot } = addBracket.dataset;
+    const m = ensureBracketMatch(bkey, slot);
+    if(m.sets.length<5) m.sets.push({a:null,b:null});
+    saveData();
+    renderStatusAndBracket();
+    return;
+  }
+  // live toggle (pool)
+  const livePool = e.target.closest('[data-live-target="pool"]');
+  if(livePool){
+    const { pool, round } = livePool.dataset;
+    const m = ensureMatch(pool, Number(round));
+    m.live = !m.live;
+    saveData();
+    renderPoolSection();
+    return;
+  }
+  // live toggle (bracket)
+  const liveBracket = e.target.closest('[data-live-target="bracket"]');
+  if(liveBracket){
+    const { bkey, slot } = liveBracket.dataset;
+    const m = ensureBracketMatch(bkey, slot);
+    m.live = !m.live;
+    saveData();
+    renderStatusAndBracket();
+    return;
+  }
+  // complete pool play
+  if(e.target.id==='completePoolBtn'){
+    const allPlayed = POOLS.every(p=> poolStandings(p).complete);
+    if(!allPlayed){
+      if(!confirm('Not every pool match has a result yet. Mark pool play complete anyway? You can reopen it later if needed.')) return;
+    }
+    state.poolPlayComplete = true;
+    saveData();
+    renderAll();
+    document.getElementById('bracket-section').scrollIntoView({ behavior:'smooth', block:'start' });
+    return;
+  }
+  // reopen pool play
+  if(e.target.id==='reopenPoolBtn'){
+    if(confirm('Reopen pool play? The bracket below will show as locked again until you complete pool play a second time.')){
+      state.poolPlayComplete = false;
+      saveData();
+      renderAll();
+    }
+    return;
+  }
+  // reset everything
+  if(e.target.id==='resetBtn'){
+    if(confirm('This clears every pool score, bracket score, and the pool-play-complete status for everyone. Are you sure?')){
+      state.matches = {};
+      state.bracketMatches = { gold:{}, silver:{} };
+      state.poolPlayComplete = false;
+      saveData();
+      renderAll();
+    }
+    return;
+  }
+});
+
+// ---------- INIT ----------
+(async function init(){
+  await loadState();
+  renderAll();
+  startPolling();
+})();
+</script>
+</body>
+</html>

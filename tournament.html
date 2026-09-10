@@ -110,15 +110,18 @@
   .court-head .pool-name{ font-family:'Oswald'; font-size:15px; letter-spacing:0.3px; white-space:nowrap; }
   .court-head .court-tag{ font-size:10px; font-weight:700; text-align:right; line-height:1.3; }
 
-  table.sched{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.sched{ width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
   table.sched th{
     text-align:left; padding:8px 12px; color:var(--sub); font-weight:600;
     font-size:11px; text-transform:uppercase; letter-spacing:0.4px;
-    border-bottom:1px solid var(--line);
+    border-bottom:1px solid var(--line); vertical-align:top;
   }
-  table.sched td{ padding:9px 12px; border-bottom:1px solid var(--line); }
+  table.sched td{ padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
   table.sched tr:last-child td{ border-bottom:none; }
-  .time-col{ color:var(--sub); font-family:'Oswald'; font-size:13px; white-space:nowrap; }
+  table.sched th:nth-child(1), table.sched td:nth-child(1){ width:46%; }
+  table.sched th:nth-child(2), table.sched td:nth-child(2){ width:34%; }
+  table.sched th:nth-child(3), table.sched td:nth-child(3){ width:20%; }
+  .time-col{ color:var(--sub); font-family:'Oswald'; font-size:13px; }
   .court-name{ font-weight:700; }
 
   .match-row{
@@ -152,16 +155,20 @@
   }
   .live-toggle.active{ background:#C0392B; }
 
-  table.standings{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.standings{ width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
   table.standings th{
     text-align:center; padding:8px 6px; color:var(--sub); font-weight:600;
     font-size:10px; text-transform:uppercase; letter-spacing:0.3px;
-    border-bottom:1px solid var(--line);
+    border-bottom:1px solid var(--line); vertical-align:top;
   }
   table.standings th:first-child, table.standings td:first-child{ text-align:left; padding-left:12px; }
-  table.standings td{ padding:8px 6px; text-align:center; border-bottom:1px solid var(--line); font-family:'Oswald'; font-size:13px; }
+  table.standings td{ padding:8px 6px; text-align:center; border-bottom:1px solid var(--line); font-family:'Oswald'; font-size:13px; vertical-align:top; }
   table.standings tr:last-child td{ border-bottom:none; }
   table.standings td.team-name{ font-family:'Inter'; font-weight:600; font-size:13px; }
+  table.standings th:nth-child(1), table.standings td:nth-child(1){ width:46%; }
+  table.standings th:nth-child(2), table.standings td:nth-child(2){ width:20%; }
+  table.standings th:nth-child(3), table.standings td:nth-child(3){ width:17%; }
+  table.standings th:nth-child(4), table.standings td:nth-child(4){ width:17%; }
   .rank-badge{
     display:inline-block; width:18px; height:18px; border-radius:50%; background:var(--navy); color:#fff;
     font-size:10px; line-height:18px; text-align:center; margin-right:6px; font-family:'Inter'; font-weight:700;
@@ -210,6 +217,10 @@
   .bmatch-live-badge{
     text-align:center; padding:6px; font-family:'Oswald'; font-size:11px; letter-spacing:0.4px;
     background:#FCE9E9; color:#C0392B; animation:pulse 1.6s ease-in-out infinite;
+  }
+  .bmatch-score-line{
+    text-align:center; padding:6px; font-family:'Oswald'; font-size:12px; color:var(--sub);
+    border-top:1px solid var(--line);
   }
   .bmatch .slot.empty{ color:var(--pending); font-weight:400; font-style:italic; cursor:default; }
   .bmatch .slot.bye{ color:var(--sub); font-weight:400; font-style:italic; cursor:default; }
@@ -323,18 +334,11 @@
     <span>Minutes per match</span>
     <input type="number" id="matchMinutes" min="10" max="120" step="5" inputmode="numeric" pattern="[0-9]*">
   </div>
-  <div class="row">
+  <div class="row" style="margin-bottom:0;">
     <span>Warm-up between matches (min)</span>
     <input type="number" id="warmupMinutes" min="0" max="30" step="1" inputmode="numeric" pattern="[0-9]*">
   </div>
-  <div class="row">
-    <span>Scorekeeper mode</span>
-    <label class="switch"><input type="checkbox" id="scorekeeperToggle"><span class="switch-track"></span></label>
-  </div>
-  <div class="row" style="margin-bottom:0;">
-    <button class="gear" id="resetBtn" style="border-color:#C23B6B;color:#F9D6E3;">Reset all scores</button>
-  </div>
-  <div class="note">Match length isn't set by the tournament schedule, so this is adjustable &mdash; the schedule below recalculates when you change it. Round 1 has a 10-minute warm-up before the 9:00 start; later rounds use the warm-up minutes above, or whatever officials call. Turn on Scorekeeper mode to enter scores and mark matches live &mdash; leave it off so everyone else just sees results.</div>
+  <div class="note">Match length isn't set by the tournament schedule, so this is adjustable &mdash; the schedule below recalculates when you change it. Round 1 has a 10-minute warm-up before the 9:00 start; later rounds use the warm-up minutes above, or whatever officials call. Scores and bracket results are entered separately by the scorekeeper and will appear here automatically.</div>
 </div>
 
 <main>
@@ -376,9 +380,10 @@ function courtLabel(n, upper){
 }
 
 let state = {
-  settings:{ matchMinutes:45, warmupMinutes:5, scorekeeper:false },
+  settings:{ matchMinutes:45, warmupMinutes:5 },
+  poolPlayComplete:false,
   matches:{}, // key `${pool}-r${round}` -> {sets:[{a,b},...], live:false}
-  bracket:{ gold:{}, silver:{}, live:{} } // slot key -> chosen winner name; live: "gold-qfA" -> true
+  bracketMatches:{ gold:{}, silver:{} } // gold.qfA/qfB/sf1/sf2/final -> {sets:[{a,b},...], live:false}
 };
 
 function matchKey(pool,round){ return pool+'-r'+round; }
@@ -389,26 +394,66 @@ function ensureMatch(pool,round){
   return state.matches[k];
 }
 
+function ensureBracketMatch(bKey, slotKey){
+  if(!state.bracketMatches[bKey]) state.bracketMatches[bKey] = {};
+  if(!state.bracketMatches[bKey][slotKey]) state.bracketMatches[bKey][slotKey] = { sets:[{a:null,b:null}], live:false };
+  return state.bracketMatches[bKey][slotKey];
+}
+
 // ---------- PERSISTENCE ----------
+// This page is READ-ONLY: it never writes match results or bracket data. All of that is
+// entered on the separate scorekeeper page and lands in SHARED storage, which this page
+// reads and polls so every viewer sees the same live results. Only the schedule display
+// settings (match length / warm-up minutes) are personal to this device.
+let lastDataSnapshot = null;
+
 async function loadState(){
   try{
-    const res = await window.storage.get('tournament-state', false);
-    if(res && res.value){
-      const parsed = JSON.parse(res.value);
-      state = Object.assign(state, parsed);
-      if(!state.bracket) state.bracket = { gold:{}, silver:{}, live:{} };
-      if(!state.bracket.live) state.bracket.live = {};
-      if(typeof state.settings.scorekeeper !== 'boolean') state.settings.scorekeeper = false;
+    const dataRes = await window.storage.get('tournament-data', true);
+    if(dataRes && dataRes.value){
+      const parsed = JSON.parse(dataRes.value);
+      if(parsed.matches) state.matches = parsed.matches;
+      if(parsed.bracketMatches) state.bracketMatches = parsed.bracketMatches;
+      if(typeof parsed.poolPlayComplete === 'boolean') state.poolPlayComplete = parsed.poolPlayComplete;
+      lastDataSnapshot = dataRes.value;
     }
-  }catch(e){ /* no saved state yet */ }
+  }catch(e){ /* no shared data yet */ }
+
+  try{
+    const settingsRes = await window.storage.get('tournament-settings', false);
+    if(settingsRes && settingsRes.value){
+      state.settings = Object.assign(state.settings, JSON.parse(settingsRes.value));
+    }
+  }catch(e){ /* no personal settings yet */ }
+
+  if(!state.bracketMatches) state.bracketMatches = { gold:{}, silver:{} };
 }
-let saveTimer=null;
-function saveState(){
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(async ()=>{
-    try{ await window.storage.set('tournament-state', JSON.stringify(state), false); }
+
+let saveSettingsTimer=null;
+function saveSettings(){
+  clearTimeout(saveSettingsTimer);
+  saveSettingsTimer = setTimeout(async ()=>{
+    try{ await window.storage.set('tournament-settings', JSON.stringify(state.settings), false); }
     catch(e){ console.error('save failed', e); }
   }, 150);
+}
+
+// Poll the shared data every 15s so viewers see the scorekeeper's updates without reloading.
+function startLivePolling(){
+  setInterval(async ()=>{
+    try{
+      const res = await window.storage.get('tournament-data', true);
+      if(res && res.value && res.value !== lastDataSnapshot){
+        lastDataSnapshot = res.value;
+        const parsed = JSON.parse(res.value);
+        if(parsed.matches) state.matches = parsed.matches;
+        if(parsed.bracketMatches) state.bracketMatches = parsed.bracketMatches;
+        if(typeof parsed.poolPlayComplete === 'boolean') state.poolPlayComplete = parsed.poolPlayComplete;
+        renderStandings();
+        renderBracket();
+      }
+    }catch(e){ /* skip this tick */ }
+  }, 15000);
 }
 
 // ---------- TIME HELPERS ----------
@@ -521,7 +566,6 @@ function renderStandings(){
       const teamA = pool.teams[pair[0]], teamB = pool.teams[pair[1]];
       const m = ensureMatch(pool.key, round);
       const r = computeMatchResult(m, teamA, teamB);
-      const sk = state.settings.scorekeeper;
       html += '<div class="match-row">';
       html += '<div class="match-teams"><span>'+teamA+'</span><span class="vs">vs</span><span>'+teamB+'</span>';
       if(r.played){
@@ -535,19 +579,6 @@ function renderStandings(){
       html += '</div>';
       if(r.played){
         html += '<div class="score-line">'+scoreLineText(m)+'</div>';
-      }
-      if(sk){
-        html += '<div class="set-inputs">';
-        (m.sets||[]).forEach((s,si)=>{
-          html += '<div class="set-input-pair"><span class="set-label">S'+(si+1)+'</span>'+
-            '<input type="number" min="0" max="99" inputmode="numeric" pattern="[0-9]*" data-pool="'+pool.key+'" data-round="'+round+'" data-set="'+si+'" data-side="a" value="'+(s.a??'')+'">'+
-            '<span>-</span>'+
-            '<input type="number" min="0" max="99" inputmode="numeric" pattern="[0-9]*" data-pool="'+pool.key+'" data-round="'+round+'" data-set="'+si+'" data-side="b" value="'+(s.b??'')+'">'+
-            '</div>';
-        });
-        html += '<div class="set-input-pair" style="cursor:pointer;" data-add-set="'+pool.key+'-'+round+'"><span style="color:var(--sub);font-size:12px;">+ set</span></div>';
-        html += '<button class="live-toggle'+(m.live?' active':'')+'" data-live-toggle="pool:'+pool.key+'-'+round+'">'+(m.live?'Unmark live':'Mark live')+'</button>';
-        html += '</div>';
       }
       html += '</div>';
     });
@@ -611,10 +642,7 @@ function initCarousel(trackId){
   });
 }
 function getBracketSeeds(){
-  const results = POOLS.map(p=> ({ pool:p.key, ...poolStandings(p) }));
-  const allComplete = results.every(r=>r.complete);
-
-  if(!allComplete){
+  if(!state.poolPlayComplete){
     // No live team guessing pre-completion — just show which pool position feeds each slot.
     const gold = [
       { seed:1, team:'Pool A \u2014 1st place' },
@@ -632,9 +660,10 @@ function getBracketSeeds(){
       { seed:5, team:'Pool B \u2014 4th place' },
       { seed:6, team:'Pool C \u2014 4th place' }
     ];
-    return { gold, silver, allComplete:false };
+    return { gold, silver };
   }
 
+  const results = POOLS.map(p=> ({ pool:p.key, ...poolStandings(p) }));
   const rankGroup = (rankNum)=> results.map(r=> r.standings.find(s=>s.rank===rankNum));
   const sortGroup = (group)=> group.slice().sort((a,b)=> b.wins-a.wins || b.setPct-a.setPct || b.ptPct-a.ptPct);
   const goldTop = sortGroup(rankGroup(1));    // seeds 1-3
@@ -643,66 +672,64 @@ function getBracketSeeds(){
   const silverMid = sortGroup(rankGroup(4));  // seeds 4-6
   const gold = [...goldTop, ...goldMid].map((s,i)=> ({ seed:i+1, team:s.team }));
   const silver = [...silverTop, ...silverMid].map((s,i)=> ({ seed:i+1, team:s.team }));
-  return { gold, silver, allComplete:true };
+  return { gold, silver };
 }
 
-function bracketStructure(seeds, bracketState){
+// Builds the bracket tree, computing each match's winner from entered scores (same logic
+// as pool matches) rather than a manually picked winner.
+function bracketStructure(seeds, bm){
   const bySeed = n => seeds.find(s=>s.seed===n)?.team || null;
-  const getWinner = (slotKey, teamX, teamY)=>{
-    const chosen = bracketState[slotKey];
-    if(chosen && (chosen===teamX || chosen===teamY)) return chosen;
-    return null;
-  };
+  const get = (slotKey)=> bm[slotKey] || { sets:[{a:null,b:null}], live:false };
+
   const qfA_x = bySeed(4), qfA_y = bySeed(5);
   const qfB_x = bySeed(3), qfB_y = bySeed(6);
-  const qfA_winner = getWinner('qfA', qfA_x, qfA_y);
-  const qfB_winner = getWinner('qfB', qfB_x, qfB_y);
-  const sf1_x = bySeed(1), sf1_y = qfA_winner;
-  const sf2_x = bySeed(2), sf2_y = qfB_winner;
-  const sf1_winner = getWinner('sf1', sf1_x, sf1_y);
-  const sf2_winner = getWinner('sf2', sf2_x, sf2_y);
-  const final_winner = getWinner('final', sf1_winner, sf2_winner);
+  const qfA_res = computeMatchResult(get('qfA'), qfA_x, qfA_y);
+  const qfB_res = computeMatchResult(get('qfB'), qfB_x, qfB_y);
+
+  const sf1_x = bySeed(1), sf1_y = qfA_res.winner;
+  const sf2_x = bySeed(2), sf2_y = qfB_res.winner;
+  const sf1_res = computeMatchResult(get('sf1'), sf1_x, sf1_y);
+  const sf2_res = computeMatchResult(get('sf2'), sf2_x, sf2_y);
+
+  const final_res = computeMatchResult(get('final'), sf1_res.winner, sf2_res.winner);
+
   return {
-    qfA:{ x:qfA_x, y:qfA_y, xSeed:4, ySeed:5, winner:qfA_winner, key:'qfA' },
-    qfB:{ x:qfB_x, y:qfB_y, xSeed:3, ySeed:6, winner:qfB_winner, key:'qfB' },
-    sf1:{ x:sf1_x, y:sf1_y, xSeed:1, ySeed:null, winner:sf1_winner, key:'sf1' },
-    sf2:{ x:sf2_x, y:sf2_y, xSeed:2, ySeed:null, winner:sf2_winner, key:'sf2' },
-    final:{ x:sf1_winner, y:sf2_winner, winner:final_winner, key:'final' }
+    qfA:{ x:qfA_x, y:qfA_y, xSeed:4, ySeed:5, winner:qfA_res.winner, played:qfA_res.played, m:get('qfA') },
+    qfB:{ x:qfB_x, y:qfB_y, xSeed:3, ySeed:6, winner:qfB_res.winner, played:qfB_res.played, m:get('qfB') },
+    sf1:{ x:sf1_x, y:sf1_y, xSeed:1, ySeed:null, winner:sf1_res.winner, played:sf1_res.played, m:get('sf1') },
+    sf2:{ x:sf2_x, y:sf2_y, xSeed:2, ySeed:null, winner:sf2_res.winner, played:sf2_res.played, m:get('sf2') },
+    final:{ x:sf1_res.winner, y:sf2_res.winner, winner:final_res.winner, played:final_res.played, m:get('final') }
   };
 }
 
-function renderBracketGroup(label, colorClass, bracketKey, seeds, bracketState, courtNote, isPlaceholder, scorekeeper){
-  const st = bracketStructure(seeds, isPlaceholder ? {} : bracketState);
-  const slot = (name, seed, key, isWinner, disabled)=>{
+function renderBracketGroup(label, colorClass, bracketKey, seeds, bm, courtNote, isPlaceholder){
+  const st = bracketStructure(seeds, isPlaceholder ? {} : bm);
+  const slot = (name, seed, isWinner, disabled)=>{
     if(name===null && !disabled) return '<div class="slot empty">TBD</div>';
     if(disabled) return '<div class="slot bye'+(isPlaceholder?' placeholder-slot':'')+'">'+(name||'&mdash;')+' &mdash; bye</div>';
     if(isPlaceholder) return '<div class="slot placeholder-slot"><span>'+name+'</span></div>';
-    const pickAttrs = scorekeeper ? ' data-pick="'+key+'" data-team="'+name+'"' : '';
-    return '<div class="slot'+(isWinner?' winner':'')+(scorekeeper?'':' static')+'"'+pickAttrs+'>'+
+    return '<div class="slot static'+(isWinner?' winner':'')+'">'+
       '<span><span class="seed">'+(seed?('#'+seed):'')+'</span>'+name+'</span>'+(isWinner?'&#10003;':'')+'</div>';
   };
-  const liveFooter = (slotKey, x, y, winner)=>{
-    if(isPlaceholder || x===null || y===null || winner) return '';
-    const liveKey = bracketKey+'-'+slotKey;
-    const isLive = !!state.bracket.live[liveKey];
-    if(scorekeeper){
-      return '<button class="live-toggle'+(isLive?' active':'')+'" data-live-toggle="bracket:'+liveKey+'">'+(isLive?'Unmark live':'Mark live')+'</button>';
-    }
-    return isLive ? '<div class="bmatch-live-badge">LIVE</div>' : '';
+  const statusFooter = (x, y, played, live, m)=>{
+    if(isPlaceholder || x===null || y===null) return '';
+    if(played) return '<div class="bmatch-score-line">'+scoreLineText(m)+'</div>';
+    if(live) return '<div class="bmatch-live-badge">LIVE</div>';
+    return '';
   };
   let html = '<div class="bracket-group">';
   html += '<div class="bracket-group-head"><span class="dot '+colorClass+'"></span><h2>'+label+'</h2><span class="court-note">'+courtNote+'</span></div>';
 
   html += '<div class="round-label">Quarterfinal</div>';
-  html += '<div class="bmatch">'+slot(st.qfA.x, st.qfA.xSeed, 'qfA', st.qfA.winner===st.qfA.x, false)+slot(st.qfA.y, st.qfA.ySeed, 'qfA', st.qfA.winner===st.qfA.y, false)+liveFooter('qfA', st.qfA.x, st.qfA.y, st.qfA.winner)+'</div>';
-  html += '<div class="bmatch">'+slot(st.qfB.x, st.qfB.xSeed, 'qfB', st.qfB.winner===st.qfB.x, false)+slot(st.qfB.y, st.qfB.ySeed, 'qfB', st.qfB.winner===st.qfB.y, false)+liveFooter('qfB', st.qfB.x, st.qfB.y, st.qfB.winner)+'</div>';
+  html += '<div class="bmatch">'+slot(st.qfA.x, st.qfA.xSeed, st.qfA.winner===st.qfA.x, false)+slot(st.qfA.y, st.qfA.ySeed, st.qfA.winner===st.qfA.y, false)+statusFooter(st.qfA.x, st.qfA.y, st.qfA.played, st.qfA.m.live, st.qfA.m)+'</div>';
+  html += '<div class="bmatch">'+slot(st.qfB.x, st.qfB.xSeed, st.qfB.winner===st.qfB.x, false)+slot(st.qfB.y, st.qfB.ySeed, st.qfB.winner===st.qfB.y, false)+statusFooter(st.qfB.x, st.qfB.y, st.qfB.played, st.qfB.m.live, st.qfB.m)+'</div>';
 
   html += '<div class="round-label">Semifinal (seeds 1 &amp; 2 bye to here)</div>';
-  html += '<div class="bmatch">'+slot(st.sf1.x, st.sf1.xSeed, 'sf1', st.sf1.winner===st.sf1.x, !st.sf1.y)+slot(st.sf1.y, null, 'sf1', st.sf1.winner===st.sf1.y, !st.sf1.y)+liveFooter('sf1', st.sf1.x, st.sf1.y, st.sf1.winner)+'</div>';
-  html += '<div class="bmatch">'+slot(st.sf2.x, st.sf2.xSeed, 'sf2', st.sf2.winner===st.sf2.x, !st.sf2.y)+slot(st.sf2.y, null, 'sf2', st.sf2.winner===st.sf2.y, !st.sf2.y)+liveFooter('sf2', st.sf2.x, st.sf2.y, st.sf2.winner)+'</div>';
+  html += '<div class="bmatch">'+slot(st.sf1.x, st.sf1.xSeed, st.sf1.winner===st.sf1.x, !st.sf1.y)+slot(st.sf1.y, null, st.sf1.winner===st.sf1.y, !st.sf1.y)+statusFooter(st.sf1.x, st.sf1.y, st.sf1.played, st.sf1.m.live, st.sf1.m)+'</div>';
+  html += '<div class="bmatch">'+slot(st.sf2.x, st.sf2.xSeed, st.sf2.winner===st.sf2.x, !st.sf2.y)+slot(st.sf2.y, null, st.sf2.winner===st.sf2.y, !st.sf2.y)+statusFooter(st.sf2.x, st.sf2.y, st.sf2.played, st.sf2.m.live, st.sf2.m)+'</div>';
 
   html += '<div class="round-label">Final</div>';
-  html += '<div class="bmatch">'+slot(st.final.x, null, 'final', st.final.winner===st.final.x, !st.final.x)+slot(st.final.y, null, 'final', st.final.winner===st.final.y, !st.final.y)+liveFooter('final', st.final.x, st.final.y, st.final.winner)+'</div>';
+  html += '<div class="bmatch">'+slot(st.final.x, null, st.final.winner===st.final.x, !st.final.x)+slot(st.final.y, null, st.final.winner===st.final.y, !st.final.y)+statusFooter(st.final.x, st.final.y, st.final.played, st.final.m.live, st.final.m)+'</div>';
 
   if(!isPlaceholder && st.final.winner){
     html += '<div class="champ-banner"><div class="label">'+label+' Champion</div><div class="name">'+st.final.winner+'</div></div>';
@@ -712,17 +739,17 @@ function renderBracketGroup(label, colorClass, bracketKey, seeds, bracketState, 
 }
 
 function renderBracket(){
-  const { gold, silver, allComplete } = getBracketSeeds();
-  const sk = state.settings.scorekeeper;
+  const { gold, silver } = getBracketSeeds();
+  const complete = state.poolPlayComplete;
   let html = '<div class="tiebreak-note" style="margin-bottom:16px;background:var(--card);border:1px solid var(--line);border-radius:8px;">';
-  if(allComplete){
+  if(complete){
     html += 'Seeds 1-3 in each bracket are the pool winners/runner-ups (or 3rd/4th place teams for Silver), ranked by record, set %, then point %. <span class="final-flag">Final seeding</span>';
   } else {
-    html += 'Pool play isn\u2019t finished yet, so team names aren\u2019t locked in. This shows the bracket shape and which pool finish feeds each slot &mdash; not final seed order. Real matchups and seeding appear here once all three pools wrap up. <span class="provisional-flag">Pool play in progress</span>';
+    html += 'Pool play isn\u2019t finished yet, so team names aren\u2019t locked in. This shows the bracket shape and which pool finish feeds each slot &mdash; not final seed order. Real matchups and seeding appear here once pool play is marked complete. <span class="provisional-flag">Pool play in progress</span>';
   }
   html += '</div>';
-  html += renderBracketGroup('Purple Bracket', 'purple', 'gold', gold, state.bracket.gold, courtLabel(1)+' &amp; '+courtLabel(2), !allComplete, sk);
-  html += renderBracketGroup('Teal Bracket', 'teal', 'silver', silver, state.bracket.silver, courtLabel(3), !allComplete, sk);
+  html += renderBracketGroup('Purple Bracket', 'purple', 'gold', gold, state.bracketMatches.gold, courtLabel(1)+' &amp; '+courtLabel(2), !complete);
+  html += renderBracketGroup('Teal Bracket', 'teal', 'silver', silver, state.bracketMatches.silver, courtLabel(3), !complete);
   document.getElementById('view-bracket').innerHTML = html;
 }
 
@@ -735,23 +762,8 @@ function renderAll(){
 }
 
 document.addEventListener('input', (e)=>{
-  if(e.target.matches('input[data-pool]')){
-    const { pool, round, set, side } = e.target.dataset;
-    const m = ensureMatch(pool, Number(round));
-    const val = e.target.value === '' ? null : Number(e.target.value);
-    m.sets[Number(set)][side] = val;
-    saveState();
-    renderStandings();
-    renderBracket();
-  }
-  if(e.target.id==='matchMinutes'){ state.settings.matchMinutes = Number(e.target.value)||45; saveState(); renderSchedule(); }
-  if(e.target.id==='warmupMinutes'){ state.settings.warmupMinutes = Number(e.target.value)||0; saveState(); renderSchedule(); }
-  if(e.target.id==='scorekeeperToggle'){
-    state.settings.scorekeeper = e.target.checked;
-    saveState();
-    renderStandings();
-    renderBracket();
-  }
+  if(e.target.id==='matchMinutes'){ state.settings.matchMinutes = Number(e.target.value)||45; saveSettings(); renderSchedule(); }
+  if(e.target.id==='warmupMinutes'){ state.settings.warmupMinutes = Number(e.target.value)||0; saveSettings(); renderSchedule(); }
 });
 
 document.addEventListener('click', (e)=>{
@@ -777,61 +789,6 @@ document.addEventListener('click', (e)=>{
     document.getElementById('settingsPanel').classList.toggle('open');
     return;
   }
-  // reset
-  if(e.target.id==='resetBtn'){
-    if(confirm('Clear all entered scores and bracket picks?')){
-      state.matches = {};
-      state.bracket = { gold:{}, silver:{}, live:{} };
-      saveState();
-      renderAll();
-    }
-    return;
-  }
-  // live toggle (pool or bracket match)
-  const liveBtn = e.target.closest('[data-live-toggle]');
-  if(liveBtn){
-    const raw = liveBtn.dataset.liveToggle;
-    if(raw.startsWith('pool:')){
-      const [pool, round] = raw.slice(5).split('-r');
-      const m = ensureMatch(pool, Number(round));
-      m.live = !m.live;
-      saveState();
-      renderStandings();
-    } else if(raw.startsWith('bracket:')){
-      const liveKey = raw.slice(8);
-      state.bracket.live[liveKey] = !state.bracket.live[liveKey];
-      saveState();
-      renderBracket();
-    }
-    return;
-  }
-  // add set
-  const addSet = e.target.closest('[data-add-set]');
-  if(addSet){
-    const [pool, round] = addSet.dataset.addSet.split('-r');
-    const m = ensureMatch(pool, Number(round));
-    if(m.sets.length<5) m.sets.push({a:null,b:null});
-    saveState();
-    renderStandings();
-    return;
-  }
-  // bracket pick
-  const pick = e.target.closest('.slot[data-pick]');
-  if(pick){
-    const bracketEl = pick.closest('.bracket-group');
-    const isGold = bracketEl.querySelector('.dot').classList.contains('purple');
-    const bKey = isGold ? 'gold' : 'silver';
-    const slotKey = pick.dataset.pick;
-    const team = pick.dataset.team;
-    if(state.bracket[bKey][slotKey] === team){
-      delete state.bracket[bKey][slotKey]; // toggle off
-    } else {
-      state.bracket[bKey][slotKey] = team;
-    }
-    saveState();
-    renderBracket();
-    return;
-  }
 });
 
 // ---------- INIT ----------
@@ -839,8 +796,8 @@ document.addEventListener('click', (e)=>{
   await loadState();
   document.getElementById('matchMinutes').value = state.settings.matchMinutes;
   document.getElementById('warmupMinutes').value = state.settings.warmupMinutes;
-  document.getElementById('scorekeeperToggle').checked = state.settings.scorekeeper;
   renderAll();
+  startLivePolling();
 })();
 </script>
 </body>
