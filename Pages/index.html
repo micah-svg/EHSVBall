@@ -59,6 +59,12 @@
   header .contact-note{
     margin:0 0 18px 0; font-size:12px; color:#AEB8B2;
   }
+  .concessions-banner{
+    background:#FF3D96; color:#fff; text-align:center;
+    font-family:'Oswald'; font-weight:700; font-size:13px; letter-spacing:0.2px;
+    margin:calc(-22px - env(safe-area-inset-top)) -22px 14px -22px;
+    padding:calc(10px + env(safe-area-inset-top)) 16px 10px 16px;
+  }
   .gear{
     background:none; border:1px solid rgba(255,255,255,0.3); color:#fff;
     border-radius:8px; padding:9px 12px; font-size:12px; font-family:'Inter';
@@ -127,6 +133,21 @@
   table.sched th:nth-child(3), table.sched td:nth-child(3){ width:14%; }
   table.sched th:nth-child(4), table.sched td:nth-child(4){ width:24%; }
   .time-col{ color:var(--sub); font-family:'Oswald'; font-size:13px; }
+
+  table.pooltable{ width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
+  table.pooltable th{
+    text-align:left; padding:8px 10px; color:var(--sub); font-weight:600;
+    font-size:11px; text-transform:uppercase; letter-spacing:0.4px;
+    border-bottom:1px solid var(--line); vertical-align:top;
+  }
+  table.pooltable td{ padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.pooltable tr:last-child td{ border-bottom:none; }
+  table.pooltable th:nth-child(1), table.pooltable td:nth-child(1){ width:26%; }
+  table.pooltable th:nth-child(2), table.pooltable td:nth-child(2){ width:20%; }
+  table.pooltable th:nth-child(3), table.pooltable td:nth-child(3){ width:8%; text-align:center; }
+  table.pooltable th:nth-child(4), table.pooltable td:nth-child(4){ width:20%; }
+  table.pooltable th:nth-child(5), table.pooltable td:nth-child(5){ width:26%; }
+  table.pooltable .rd-col{ text-align:center; font-family:'Oswald'; color:var(--sub); }
   .court-name{ font-weight:700; }
 
   .match-row{
@@ -134,10 +155,14 @@
   }
   .match-row:last-child{ border-bottom:none; }
   .match-teams{
-    display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;
+    display:grid; grid-template-columns:32% 8% 32% 28%; column-gap:4px;
+    align-items:center; margin-bottom:6px;
     font-size:14px; font-weight:600;
   }
-  .match-teams .vs{ color:var(--sub); font-weight:400; font-size:12px; padding:0 6px; }
+  .match-teams .team-a{ text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .match-teams .team-b{ text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .match-teams .vs{ color:var(--sub); font-weight:400; font-size:12px; text-align:center; }
+  .match-teams .status-cell{ text-align:right; }
   .set-inputs{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .set-input-pair{ display:flex; align-items:center; gap:4px; background:var(--bg); border-radius:8px; padding:6px 8px; }
   .set-input-pair input{
@@ -232,6 +257,7 @@
     display:block; text-align:center; padding:5px 6px; font-family:'Oswald'; font-size:10px;
     font-weight:700; letter-spacing:0.4px; background:var(--bg); border-bottom:1px solid var(--line);
   }
+  .bmatch-court .game-id{ color:var(--navy); }
   .bmatch-work-note{
     text-align:center; padding:6px; border-top:1px solid var(--line); margin-top:0;
   }
@@ -330,6 +356,7 @@
 <body>
 
 <header>
+  <div class="concessions-banner">Food, drink, jewelry, bag charms and merch available all day at EHS &mdash; only a 3 minute walk from River Mill.</div>
   <div class="top-row">
     <div>
       <div class="host-line">Estacada High School presents</div>
@@ -584,30 +611,26 @@ function renderStandings(){
   POOLS.forEach(pool=>{
     const { standings } = poolStandings(pool);
     html += '<div class="court-card"><div class="court-head"><span class="pool-name">Pool '+pool.key+'</span><span class="court-tag">'+courtLabel(pool.court, true)+'</span></div>';
-    // matches
+    // matches — same column order as the Schedule tab (Match, Location, then a round/pool identifier, then Work Team), plus Result since that's the point of this tab
+    html += '<table class="pooltable"><thead><tr><th>Match</th><th>Location</th><th>Rd</th><th>Work Team</th><th>Result</th></tr></thead><tbody>';
     ROUND_PATTERN.forEach((pair, idx)=>{
       const round = idx+1;
       const teamA = pool.teams[pair[0]], teamB = pool.teams[pair[1]];
       const m = ensureMatch(pool.key, round);
       const r = computeMatchResult(m, teamA, teamB);
       const workTeam = pool.teams[WORK_PATTERN[idx]];
-      html += '<div class="match-row">';
-      html += '<div class="match-teams"><span>'+teamA+'</span><span class="vs">vs</span><span>'+teamB+'</span>';
+      let resultCell;
       if(r.played){
         const tag = r.winner===teamA ? teamA+' won' : teamB+' won';
-        html += '<span class="result-tag win">'+tag+'</span>';
+        resultCell = '<span class="result-tag win">'+tag+'</span><div class="score-line">'+scoreLineText(m)+'</div>';
       } else if(m.live){
-        html += '<span class="result-tag live">LIVE</span>';
+        resultCell = '<span class="result-tag live">LIVE</span>';
       } else {
-        html += '<span class="result-tag pending">Not played</span>';
+        resultCell = '<span class="result-tag pending">Not played</span>';
       }
-      html += '</div>';
-      html += '<div class="work-note">Working this match: '+workTeam+'</div>';
-      if(r.played){
-        html += '<div class="score-line">'+scoreLineText(m)+'</div>';
-      }
-      html += '</div>';
+      html += '<tr><td>'+teamA+' vs '+teamB+'</td><td class="time-col">'+courtLabel(pool.court)+'</td><td class="rd-col">R'+round+'</td><td>'+workTeam+'</td><td>'+resultCell+'</td></tr>';
     });
+    html += '</tbody></table>';
     // standings table
     html += '<table class="standings"><thead><tr><th>Team</th><th>W-L</th><th>Set%</th><th>Pt%</th></tr></thead><tbody>';
     standings.forEach(s=>{
@@ -618,6 +641,7 @@ function renderStandings(){
     });
     html += '</tbody></table>';
     html += '<div class="tiebreak-note">Tiebreakers, in order: pool record &rarr; head-to-head (2-way ties only) &rarr; set % &rarr; point %. Places 1-2 advance to the Purple bracket, 3-4 to the Teal bracket.</div>';
+    html += '<div class="tiebreak-note">Once pool play is complete: this pool\u2019s 1st and 2nd place finishers move on to the Purple Bracket (EHS Main Gym &amp; EHS Aux Gym); 3rd and 4th place finishers move on to the Teal Bracket (River Mill Gym). Within each bracket, the best cross-pool record earns a bye into the semifinal and works that gym\u2019s first quarterfinal instead of playing it; the rest play in the quarterfinal, and the losing team then works the next match on that same court. Exact opponents and court assignments depend on how every pool finishes &mdash; check the Bracket tab once pool play is marked complete.</div>';
     html += '<div class="tiebreak-note">Work Team provides 2 line judges per set, a libero tracker, and a score flipper for that match.</div>';
     html += '</div>';
   });
@@ -716,6 +740,9 @@ const SLOT_COURT = {
   gold:   { qfA:1, qfB:2, sf1:1, sf2:2, final:1 },
   silver: { qfA:3, qfB:3, sf1:3, sf2:3, final:3 }
 };
+// Game ID for OSAA reporting: numbered 1-5 within each bracket, in schedule order
+// (quarterfinals first, then semis, then the final).
+const GAME_ID = { qfA:1, qfB:2, sf1:3, sf2:4, final:5 };
 
 // A team eliminated from a bracket match works the NEXT match scheduled on that same
 // court. The very first match on each court has no prior loser to draw from, so instead
@@ -773,7 +800,7 @@ function bracketStructure(seeds, bm){
 
 function renderBracketGroup(label, colorClass, bracketKey, seeds, bm, courtNote, isPlaceholder){
   const st = bracketStructure(seeds, isPlaceholder ? {} : bm);
-  const work = isPlaceholder ? {} : computeWorkTeams(st, bracketKey, seeds);
+  const work = computeWorkTeams(st, bracketKey, seeds);
   const slot = (name, seed, isWinner, disabled)=>{
     if(name===null && !disabled) return '<div class="slot empty">TBD</div>';
     if(disabled) return '<div class="slot bye'+(isPlaceholder?' placeholder-slot':'')+'">'+(name||'&mdash;')+' &mdash; bye</div>';
@@ -788,11 +815,12 @@ function renderBracketGroup(label, colorClass, bracketKey, seeds, bm, courtNote,
     return '';
   };
   const workFooter = (slotKey, x, y)=>{
-    if(isPlaceholder || x===null || y===null) return '';
+    if(x===null || y===null) return '';
     const w = work[slotKey];
-    return '<div class="work-note bmatch-work-note">'+(w ? 'Working this match: '+w : 'Work team TBD until the previous match on this court finishes')+'</div>';
+    if(isPlaceholder) return '<div class="work-note bmatch-work-note">Work Team: '+w+'</div>';
+    return '<div class="work-note bmatch-work-note">'+(w ? 'Work Team: '+w : 'Work Team: TBD until the previous match on this court finishes')+'</div>';
   };
-  const courtTag = (slotKey)=> isPlaceholder ? '' : '<span class="bmatch-court">'+courtLabel(SLOT_COURT[bracketKey][slotKey])+'</span>';
+  const courtTag = (slotKey)=> '<span class="bmatch-court"><span class="game-id">Game '+GAME_ID[slotKey]+'</span> &middot; '+courtLabel(SLOT_COURT[bracketKey][slotKey])+'</span>';
   let html = '<div class="bracket-group">';
   html += '<div class="bracket-group-head"><span class="dot '+colorClass+'"></span><h2>'+label+'</h2><span class="court-note">'+courtNote+'</span></div>';
 
@@ -821,13 +849,13 @@ function renderBracket(){
   if(complete){
     html += 'Seeds 1-3 in each bracket are the pool winners/runner-ups (or 3rd/4th place teams for Silver), ranked by record, set %, then point %. <span class="final-flag">Final seeding</span>';
   } else {
-    html += 'Pool play isn\u2019t finished yet, so team names aren\u2019t locked in. This shows the bracket shape and which pool finish feeds each slot &mdash; not final seed order. Real matchups and seeding appear here once pool play is marked complete. <span class="provisional-flag">Pool play in progress</span>';
+    html += 'Pool play isn\u2019t finished yet, so team names aren\u2019t locked in. This shows the bracket shape and which pool finish feeds each slot &mdash; not final seed order. The quarterfinal work-team assignments below are based on that same pool finish, so you can see roughly where you might be reffing in the afternoon, but they can still shift if final pool standings change. <span class="provisional-flag">Pool play in progress</span>';
   }
   html += '</div>';
   html += renderBracketGroup('Purple Bracket', 'purple', 'gold', gold, state.bracketMatches.gold, courtLabel(1)+' &amp; '+courtLabel(2), !complete);
   html += renderBracketGroup('Teal Bracket', 'teal', 'silver', silver, state.bracketMatches.silver, courtLabel(3), !complete);
   if(complete){
-    html += '<div class="tiebreak-note" style="margin-top:16px;">A team eliminated from bracket play works the next match on that same court &mdash; 2 line judges per set, a libero tracker, and a score flipper. The first match on each court is worked by the lowest-seeded team already scheduled to play there next, so no one has to travel to another gym just to work.</div>';
+    html += '<div class="tiebreak-note" style="margin-top:16px;">A team eliminated from bracket play works the next match on that same court &mdash; 2 line judges per set, a libero tracker, and a score flipper. The first match on each court is worked by the lowest-seeded team already scheduled to play there next, so no one has to travel to another gym just to work. Each game\u2019s ID (shown above the matchup) is used to report bracket results to OSAA for official RPI ranking.</div>';
   }
   document.getElementById('view-bracket').innerHTML = html;
 }
