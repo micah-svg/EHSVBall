@@ -8,6 +8,7 @@
 <title>Live Pools — Sophie Montez Memorial Tournament</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --navy:#0B3D34;
@@ -25,24 +26,49 @@
     margin:0; height:100%; background:var(--bg); color:var(--ink);
     font-family:'Inter',sans-serif; overflow:hidden;
   }
+  body{ display:flex; flex-direction:column; }
   h1,h2,h3{ font-family:'Oswald',sans-serif; }
 
   header{
-    background:var(--navy); color:#fff; padding:18px 32px;
-    display:flex; justify-content:space-between; align-items:center;
+    background:var(--navy); color:#fff; padding:14px 32px;
+    display:flex; align-items:center; gap:22px; flex-shrink:0;
   }
+  .qr-block{ display:flex; align-items:center; gap:14px; flex-shrink:0; }
+  .title-block{ flex:1; min-width:0; }
   header h1{ margin:0; font-size:2vw; font-weight:600; letter-spacing:0.3px; }
   header .sub{ font-size:1.1vw; color:#CBA9B2; margin-top:4px; }
-  header .updated{ font-size:1vw; color:#AEB8B2; text-align:right; white-space:nowrap; }
+  header .updated{ font-size:1vw; color:#AEB8B2; text-align:right; white-space:nowrap; flex-shrink:0; }
   header .updated .dot{
     display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--win);
     margin-right:6px; animation:pulse 2s ease-in-out infinite;
   }
   @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
 
+  .qr-badge{
+    position:relative; width:clamp(96px, 8.5vw, 150px); aspect-ratio:1;
+    flex-shrink:0; border-radius:50%;
+    animation:qrPulseRing 2.4s ease-in-out infinite;
+  }
+  @keyframes qrPulseRing{
+    0%,100%{ box-shadow:0 0 0 0 rgba(232,116,158,0.55); }
+    50%{ box-shadow:0 0 0 14px rgba(232,116,158,0); }
+  }
+  .qr-badge svg{ position:absolute; inset:0; width:100%; height:100%; }
+  .qr-badge .qr-code-wrap{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:62%; height:62%; background:#fff; border-radius:8px;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+    box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  }
+  .qr-badge .qr-code-wrap img, .qr-badge .qr-code-wrap canvas, .qr-badge .qr-code-wrap table{
+    width:100% !important; height:100% !important;
+  }
+  .qr-label-main{ font-size:1.15vw; font-weight:700; color:var(--gold); letter-spacing:0.4px; white-space:nowrap; }
+  .qr-label-sub{ font-size:0.85vw; color:#CBA9B2; white-space:nowrap; }
+
   main{
     display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px;
-    padding:18px 18px 0 18px; height:calc(100vh - 88px); overflow:hidden;
+    padding:18px 18px 0 18px; flex:1; min-height:0; overflow:hidden;
   }
 
   .pool-col{
@@ -98,7 +124,23 @@
 <body>
 
 <header>
-  <div>
+  <div class="qr-block">
+    <div class="qr-badge">
+      <svg viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="47" fill="#fff" stroke="#E8749E" stroke-width="3"/>
+        <path d="M50,4 C24,22 24,78 50,96" fill="none" stroke="#E8749E" stroke-width="2.5"/>
+        <path d="M50,4 C76,22 76,78 50,96" fill="none" stroke="#E8749E" stroke-width="2.5"/>
+        <path d="M4,50 C28,37 72,37 96,50" fill="none" stroke="#E8749E" stroke-width="2.5"/>
+        <path d="M4,50 C28,63 72,63 96,50" fill="none" stroke="#E8749E" stroke-width="2.5"/>
+      </svg>
+      <div class="qr-code-wrap" id="qrCode"></div>
+    </div>
+    <div>
+      <div class="qr-label-main">SCAN ME</div>
+      <div class="qr-label-sub">for live scores</div>
+    </div>
+  </div>
+  <div class="title-block">
     <h1>Sophie Montez Memorial Tournament</h1>
     <div class="sub">Live Pool Play</div>
   </div>
@@ -251,6 +293,15 @@ async function pollData(){
     setUpdatedNow();
   }catch(e){ /* keep showing the last good data */ }
 }
+
+new QRCode(document.getElementById('qrCode'), {
+  text: 'https://ehsvball.netlify.app/',
+  width: 200,
+  height: 200,
+  colorDark: '#E8749E',
+  colorLight: '#ffffff',
+  correctLevel: QRCode.CorrectLevel.H
+});
 
 (async function init(){
   render();

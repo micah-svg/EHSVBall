@@ -119,6 +119,10 @@
   }
   .court-head .pool-name{ font-family:'Oswald'; font-size:15px; letter-spacing:0.3px; white-space:nowrap; }
   .court-head .court-tag{ font-size:10px; font-weight:700; text-align:right; line-height:1.3; }
+  .roster-toggle{ cursor:pointer; user-select:none; }
+  .roster-chevron{ display:inline-block; font-size:11px; margin-left:4px; transition:transform 0.2s ease; transform:rotate(0deg); }
+  .roster-card.collapsed .roster-chevron{ transform:rotate(-90deg); }
+  .roster-card.collapsed .roster-body{ display:none; }
 
   table.sched{ width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
   table.sched th{
@@ -381,9 +385,8 @@
   </div>
   <nav>
     <button data-view="about" class="active">About Sophie</button>
-    <button data-view="schedule">Schedule</button>
-    <button data-view="standings">Pools</button>
-    <button data-view="bracket">Bracket</button>
+    <button data-view="standings">Pool Play</button>
+    <button data-view="bracket">Bracket Play</button>
     <button data-view="rosters">Rosters</button>
   </nav>
 </header>
@@ -406,7 +409,6 @@
   </div>
 
   <section class="view active" id="view-about"></section>
-  <section class="view" id="view-schedule"></section>
   <section class="view" id="view-standings"></section>
   <section class="view" id="view-bracket"></section>
   <section class="view" id="view-rosters"></section>
@@ -622,19 +624,6 @@ function startLivePolling(){
 }
 
 // ---------- TIME HELPERS ----------
-function fmtTime(mins){
-  let h = Math.floor(mins/60), m = mins%60;
-  const ampm = h>=12 ? 'PM':'AM';
-  let h12 = h%12; if(h12===0) h12=12;
-  return h12+':'+String(m).padStart(2,'0')+' '+ampm;
-}
-function roundStartTimes(){
-  const { matchMinutes, warmupMinutes } = state.settings;
-  const times = [9*60];
-  for(let r=1;r<6;r++) times.push(times[r-1]+matchMinutes+warmupMinutes);
-  return times;
-}
-
 // ---------- MATCH RESULT CALC ----------
 function computeMatchResult(m, teamA, teamB){
   let setsA=0,setsB=0,ptsA=0,ptsB=0,played=false;
@@ -695,39 +684,13 @@ function poolStandings(pool){
   return { standings: arr, complete };
 }
 
-// ---------- RENDER: SCHEDULE ----------
-function renderSchedule(){
-  const times = roundStartTimes();
-  let html = '';
-  html += '<div class="disclaimer-banner">'
-    + '<div class="disclaimer-title">*Times are estimates only</div>'
-    + '<div class="disclaimer-body">Matches start immediately after the previous match on that court ends &mdash; not necessarily at the clock time listed. For each team\u2019s <strong>first match of the day</strong>, warm-up is 5 minutes shared, then 4 minutes individual per team. After that first match, every match gets just <strong>5 minutes shared</strong> warm-up.</div>'
-    + '</div>';
-  for(let r=1;r<=6;r++){
-    const idx=r-1;
-    html += '<div class="court-card"><div class="court-head"><span class="pool-name">Round '+r+' &middot; '+
-      (r===1?fmtTime(times[0]-10)+' warm-up, '+fmtTime(times[0])+' start*':fmtTime(times[idx])+' start*')+
-      '</span></div><table class="sched"><thead><tr><th>Match</th><th>Location</th><th>Pool</th><th>Work Team</th></tr></thead><tbody>';
-    POOLS.forEach(pool=>{
-      const pair = ROUND_PATTERN[idx];
-      const teamA = pool.teams[pair[0]], teamB = pool.teams[pair[1]];
-      const workTeam = pool.teams[WORK_PATTERN[idx]];
-      html += '<tr><td>'+teamLink(teamA)+' vs '+teamLink(teamB)+'</td><td class="time-col">'+courtLabel(pool.court)+'</td><td>Pool '+pool.key+'</td><td>'+teamLink(workTeam)+'</td></tr>';
-    });
-    html += '</tbody></table></div>';
-  }
-  html += '<div class="tiebreak-note">Work Team is responsible for providing 2 line judges per set, a libero tracker, and a score flipper for that match.</div>';
-  html += '<div class="tiebreak-note">Bracket play begins once pool play wraps up on all three courts &mdash; check the Bracket tab for live seeding as pool results come in.</div>';
-  document.getElementById('view-schedule').innerHTML = html;
-}
-
 // ---------- RENDER: STANDINGS ----------
 function renderStandings(){
   let html = '';
   POOLS.forEach(pool=>{
     const { standings } = poolStandings(pool);
     html += '<div class="court-card"><div class="court-head"><span class="pool-name">Pool '+pool.key+'</span><span class="court-tag">'+courtLabel(pool.court, true)+'</span></div>';
-    // matches — same column order as the Schedule tab (Match, Location, then a round/pool identifier, then Work Team), plus Result since that's the point of this tab
+    // matches — same column layout as before (Match, Location, then a round/pool identifier, then Work Team), plus Result since that's the point of this tab
     html += '<table class="pooltable"><thead><tr><th>Match</th><th>Location</th><th>Rd</th><th>Work Team</th><th>Result</th></tr></thead><tbody>';
     ROUND_PATTERN.forEach((pair, idx)=>{
       const round = idx+1;
@@ -757,7 +720,7 @@ function renderStandings(){
     });
     html += '</tbody></table>';
     html += '<div class="tiebreak-note">Tiebreakers, in order: pool record &rarr; head-to-head (2-way ties only) &rarr; set % &rarr; point %. Places 1-2 advance to the Purple bracket, 3-4 to the Teal bracket.</div>';
-    html += '<div class="tiebreak-note">Once pool play is complete: this pool\u2019s 1st and 2nd place finishers move on to the Purple Bracket (EHS Main Gym &amp; EHS Aux Gym); 3rd and 4th place finishers move on to the Teal Bracket (River Mill Gym). Within each bracket, the best cross-pool record earns a bye into the semifinal and works that gym\u2019s first quarterfinal instead of playing it; the rest play in the quarterfinal, and the losing team then works the next match on that same court. Exact opponents and court assignments depend on how every pool finishes &mdash; check the Bracket tab once pool play is marked complete.</div>';
+    html += '<div class="tiebreak-note">Once pool play is complete: this pool\u2019s 1st and 2nd place finishers move on to the Purple Bracket (EHS Main Gym &amp; EHS Aux Gym); 3rd and 4th place finishers move on to the Teal Bracket (River Mill Gym). Within each bracket, the best cross-pool record earns a bye into the semifinal and works that gym\u2019s first quarterfinal instead of playing it; the rest play in the quarterfinal, and the losing team then works the next match on that same court. Exact opponents and court assignments depend on how every pool finishes &mdash; check the Bracket Play tab once pool play is marked complete.</div>';
     html += '<div class="tiebreak-note">Work Team provides 2 line judges per set, a libero tracker, and a score flipper for that match.</div>';
     html += '</div>';
   });
@@ -988,20 +951,21 @@ function renderBracket(){
 
 // ---------- RENDER: ROSTERS ----------
 function renderRosters(){
-  let html = '<div class="tiebreak-note" style="margin-bottom:16px;">Rosters as submitted to OSAA. Tap any team name anywhere on the site to jump straight here.</div>';
+  let html = '<div class="tiebreak-note" style="margin-bottom:16px;">Rosters as submitted to OSAA. Tap a school name to expand its roster &mdash; or tap any team name anywhere on the site to jump straight here.</div>';
   POOLS.forEach(pool=>{
     html += '<div class="section-title">Pool '+pool.key+'</div>';
     pool.teams.forEach(teamName=>{
       const r = ROSTERS[teamName];
-      html += '<div class="court-card" id="roster-'+teamSlug(teamName)+'">';
-      html += '<div class="court-head"><span class="pool-name">'+teamName+'</span><span class="court-tag">'+r.mascot.toUpperCase()+'</span></div>';
+      html += '<div class="court-card roster-card collapsed" id="roster-'+teamSlug(teamName)+'">';
+      html += '<div class="court-head roster-toggle"><span class="pool-name">'+teamName+' <span class="roster-chevron">&#9662;</span></span><span class="court-tag">'+r.mascot.toUpperCase()+'</span></div>';
+      html += '<div class="roster-body">';
       html += '<div class="tiebreak-note" style="border-top:none;">Head Coach: '+r.coach+(r.asst ? ' &middot; Assistant Coach'+(r.asst.includes(',')?'es':'')+': '+r.asst : '')+'</div>';
       const hasPos = r.players.some(p=>p.pos);
       html += '<table class="rostertable"><thead><tr><th class="rd-col">No.</th><th>Name</th>'+(hasPos?'<th class="rd-col">Pos</th>':'')+'<th class="rd-col">Yr</th></tr></thead><tbody>';
       r.players.forEach(p=>{
         html += '<tr><td class="rd-col">'+p.no+'</td><td>'+p.name+'</td>'+(hasPos?'<td class="rd-col">'+(p.pos||'')+'</td>':'')+'<td class="rd-col">'+p.yr+'</td></tr>';
       });
-      html += '</tbody></table></div>';
+      html += '</tbody></table></div></div>';
     });
   });
   document.getElementById('view-rosters').innerHTML = html;
@@ -1009,17 +973,11 @@ function renderRosters(){
 
 // ---------- EVENT WIRING ----------
 function renderAll(){
-  renderSchedule();
   renderStandings();
   renderBracket();
   renderAbout();
   renderRosters();
 }
-
-document.addEventListener('input', (e)=>{
-  if(e.target.id==='matchMinutes'){ state.settings.matchMinutes = Number(e.target.value)||45; saveSettings(); renderSchedule(); }
-  if(e.target.id==='warmupMinutes'){ state.settings.warmupMinutes = Number(e.target.value)||0; saveSettings(); renderSchedule(); }
-});
 
 document.addEventListener('click', (e)=>{
   // carousel dot navigation
@@ -1049,12 +1007,20 @@ document.addEventListener('click', (e)=>{
     requestAnimationFrame(()=>{
       const target = document.getElementById('roster-'+teamSlug(teamEl.dataset.team));
       if(target){
+        target.classList.remove('collapsed');
         const headerEl = document.querySelector('header');
         const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
         const top = target.getBoundingClientRect().top + window.pageYOffset - headerHeight - 12;
         window.scrollTo({ top, behavior:'smooth' });
       }
     });
+    return;
+  }
+  // roster accordion toggle
+  const rosterToggle = e.target.closest('.roster-toggle');
+  if(rosterToggle){
+    const card = rosterToggle.closest('.roster-card');
+    if(card) card.classList.toggle('collapsed');
     return;
   }
 });
