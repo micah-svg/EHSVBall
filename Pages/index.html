@@ -364,7 +364,6 @@
       <div class="sub">Coaches meeting 8:30 AM &middot; First matches 9:00 AM &middot; 3 courts</div>
       <div class="contact-note">Contact Sue Doan 971-409-4903</div>
     </div>
-    <button class="gear" id="gearBtn">Settings</button>
   </div>
   <nav>
     <button data-view="about" class="active">About Sophie</button>
@@ -373,18 +372,6 @@
     <button data-view="bracket">Bracket</button>
   </nav>
 </header>
-
-<div class="settings-panel" id="settingsPanel">
-  <div class="row">
-    <span>Minutes per match</span>
-    <input type="number" id="matchMinutes" min="10" max="120" step="5" inputmode="numeric" pattern="[0-9]*">
-  </div>
-  <div class="row" style="margin-bottom:0;">
-    <span>Warm-up between matches (min)</span>
-    <input type="number" id="warmupMinutes" min="0" max="30" step="1" inputmode="numeric" pattern="[0-9]*">
-  </div>
-  <div class="note">Match length isn't set by the tournament schedule, so this is adjustable &mdash; the schedule below recalculates when you change it. Round 1 has a 10-minute warm-up before the 9:00 start; later rounds use the warm-up minutes above, or whatever officials call. Scores and bracket results are entered separately by the scorekeeper and will appear here automatically.</div>
-</div>
 
 <main>
   <div class="vendor-note">Head to the commons area at EHS to visit our vendors.</div>
@@ -891,18 +878,11 @@ document.addEventListener('click', (e)=>{
     document.getElementById('view-'+navBtn.dataset.view).classList.add('active');
     return;
   }
-  // settings toggle
-  if(e.target.id==='gearBtn'){
-    document.getElementById('settingsPanel').classList.toggle('open');
-    return;
-  }
 });
 
 // ---------- INIT ----------
 (async function init(){
   await loadState();
-  document.getElementById('matchMinutes').value = state.settings.matchMinutes;
-  document.getElementById('warmupMinutes').value = state.settings.warmupMinutes;
   renderAll();
   startLivePolling();
 })();
