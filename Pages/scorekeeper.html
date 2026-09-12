@@ -105,7 +105,15 @@
   }
   header h1{ margin:0; font-size:19px; font-weight:600; }
   header .sub{ margin:4px 0 0 0; font-size:12px; color:#CBA9B2; }
-  main{ padding:16px; max-width:720px; margin:0 auto; }
+  main{ padding:16px; max-width:1400px; margin:0 auto; }
+  #pool-section{ display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; align-items:start; }
+  #pool-section .court-card{ margin-bottom:0; }
+  @media (max-width: 900px){
+    #pool-section{ grid-template-columns:1fr; }
+  }
+  #status-banner, .section-label, #bracket-section, .footer-actions{
+    max-width:720px; margin-left:auto; margin-right:auto;
+  }
 
   .status-banner{
     border-radius:10px; padding:14px 16px; margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
@@ -152,6 +160,12 @@
   .status-select.status-upcoming{ border-color:var(--pending); color:var(--pending); }
   .status-select.status-live{ border-color:#C0392B; color:#C0392B; }
   .status-select.status-completed{ border-color:var(--win); color:var(--win); }
+  .start-time-input{
+    font-family:'Inter'; font-size:13px; padding:8px 10px; border-radius:8px;
+    border:1.5px solid var(--line); background:#fff; color:var(--ink); margin-left:8px;
+    width:150px;
+  }
+  .start-time-input::placeholder{ color:var(--pending); }
   .bye-row{ padding:12px 14px; color:var(--sub); font-style:italic; font-size:13px; }
   .court-context{
     display:flex; justify-content:space-between; align-items:center; padding:6px 14px;
@@ -260,7 +274,8 @@ function normalizeMatch(m){
   if(status!=='upcoming' && status!=='live' && status!=='completed'){
     status = src.live ? 'live' : 'upcoming';
   }
-  return { sets, status };
+  const startTime = typeof src.startTime === 'string' ? src.startTime : '';
+  return { sets, status, startTime };
 }
 function ensureMatch(pool,round){
   const k = matchKey(pool,round);
@@ -317,13 +332,14 @@ function poolStandings(pool){
     ptPct: (s.ptsW+s.ptsL)>0 ? s.ptsW/(s.ptsW+s.ptsL) : 0
   }));
   arr.sort((a,b)=> b.wins-a.wins || b.setPct-a.setPct || b.ptPct-a.ptPct);
-  for(let i=0;i<arr.length-1;i++){
+  for(let i=0;i<arr.length-1;){
     let j=i;
     while(j+1<arr.length && arr[j+1].wins===arr[i].wins) j++;
-    if(j===i+1){
+    if(j===i+1){ // exactly two tied
       const a=arr[i], b=arr[j];
       if(a.h2h[b.team]==='L' && b.h2h[a.team]==='W'){ arr[i]=b; arr[j]=a; }
     }
+    i = j+1; // jump past the whole tied group so a 3+ way tie's last pair isn't re-checked as if it were its own 2-way tie
   }
   arr.forEach((s,i)=> s.rank = i+1);
   const complete = ROUND_PATTERN.every((pair,idx)=> computeMatchResult(ensureMatch(pool.key, idx+1), pool.teams[pair[0]], pool.teams[pair[1]]).played);
@@ -494,6 +510,7 @@ function matchRowHtml(teamA, teamB, m, dataAttrs, extraNote){
   if(teamA===null || teamB===null) return '';
   const r = computeMatchResult(m, teamA, teamB);
   const status = m.status || 'upcoming';
+  const isBracket = dataAttrs.indexOf('data-target="bracket"') !== -1;
   let html = '<div class="match-row">';
   if(extraNote) html += extraNote;
   html += '<div class="match-teams"><span>'+teamA+'</span><span class="vs">vs</span><span>'+teamB+'</span>';
@@ -504,6 +521,8 @@ function matchRowHtml(teamA, teamB, m, dataAttrs, extraNote){
     html += '<span class="result-tag pending">Completed</span>';
   } else if(status==='live'){
     html += '<span class="result-tag live">LIVE</span>';
+  } else if(isBracket && m.startTime){
+    html += '<span class="result-tag pending">'+m.startTime+'</span>';
   } else {
     html += '<span class="result-tag pending">Upcoming</span>';
   }
@@ -513,7 +532,12 @@ function matchRowHtml(teamA, teamB, m, dataAttrs, extraNote){
     '<option value="upcoming"'+(status==='upcoming'?' selected':'')+'>Upcoming</option>'+
     '<option value="live"'+(status==='live'?' selected':'')+'>Live</option>'+
     '<option value="completed"'+(status==='completed'?' selected':'')+'>Completed</option>'+
-    '</select></div>';
+    '</select>';
+  if(isBracket){
+    const timeAttrs = dataAttrs.replace('data-target', 'data-time-target');
+    html += '<input type="text" class="start-time-input" placeholder="Start time, e.g. 1:15 PM" '+timeAttrs+' value="'+(m.startTime||'')+'">';
+  }
+  html += '</div>';
   html += '<div class="set-inputs">';
   for(let si=0; si<3; si++){
     const s = (m.sets && m.sets[si]) ? m.sets[si] : {a:null,b:null};
@@ -636,6 +660,16 @@ document.addEventListener('input', (e)=>{
     const el = document.querySelector(sel);
     if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
   }
+  if(t.matches('input[data-time-target="bracket"]')){
+    const { bkey, slot } = t.dataset;
+    const m = ensureBracketMatch(bkey, slot);
+    m.startTime = t.value;
+    markDirty();
+    renderStatusAndBracket();
+    const sel = 'input[data-time-target="bracket"][data-bkey="'+bkey+'"][data-slot="'+slot+'"]';
+    const el = document.querySelector(sel);
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  }
 });
 
 document.addEventListener('change', (e)=>{
@@ -686,12 +720,12 @@ document.addEventListener('click', (e)=>{
   }
   // reset everything
   if(e.target.id==='resetBtn'){
-    if(confirm('This clears every pool score, bracket score, and the pool-play-complete status for everyone. Are you sure? This still won\u2019t reach the public site until you hit Save.')){
+    if(confirm('This clears every pool score, bracket score, and the pool-play-complete status for everyone, immediately, on the public site and displays. Are you sure?')){
       state.matches = {};
       state.bracketMatches = { gold:{}, silver:{} };
       state.poolPlayComplete = false;
-      markDirty();
       renderAll();
+      saveNow();
     }
     return;
   }

@@ -310,13 +310,14 @@ function poolStandings(pool){
     ptPct: (s.ptsW+s.ptsL)>0 ? s.ptsW/(s.ptsW+s.ptsL) : 0
   }));
   arr.sort((a,b)=> b.wins-a.wins || b.setPct-a.setPct || b.ptPct-a.ptPct);
-  for(let i=0;i<arr.length-1;i++){
+  for(let i=0;i<arr.length-1;){
     let j=i;
     while(j+1<arr.length && arr[j+1].wins===arr[i].wins) j++;
-    if(j===i+1){
+    if(j===i+1){ // exactly two tied
       const a=arr[i], b=arr[j];
       if(a.h2h[b.team]==='L' && b.h2h[a.team]==='W'){ arr[i]=b; arr[j]=a; }
     }
+    i = j+1; // jump past the whole tied group so a 3+ way tie's last pair isn't re-checked as if it were its own 2-way tie
   }
   arr.forEach((s,i)=> s.rank = i+1);
   return arr;

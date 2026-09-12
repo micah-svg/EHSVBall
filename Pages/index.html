@@ -335,6 +335,10 @@
     text-align:center; padding:6px; font-family:'Oswald'; font-size:11px; letter-spacing:0.4px;
     background:#FCE9E9; color:#C0392B; animation:pulse 1.6s ease-in-out infinite;
   }
+  .bmatch-time-badge{
+    text-align:center; padding:6px; font-family:'Oswald'; font-size:11px; letter-spacing:0.4px;
+    background:var(--bg); color:var(--sub); border-top:1px solid var(--line);
+  }
   .bmatch-score-line{
     text-align:center; padding:6px; font-family:'Oswald'; font-size:12px; color:var(--sub);
     border-top:1px solid var(--line);
@@ -766,13 +770,14 @@ function poolStandings(pool){
   }));
   arr.sort((a,b)=> b.wins-a.wins || b.setPct-a.setPct || b.ptPct-a.ptPct);
   // apply head-to-head only for clean 2-way ties on wins
-  for(let i=0;i<arr.length-1;i++){
+  for(let i=0;i<arr.length-1;){
     let j=i;
     while(j+1<arr.length && arr[j+1].wins===arr[i].wins) j++;
     if(j===i+1){ // exactly two tied
       const a=arr[i], b=arr[j];
       if(a.h2h[b.team]==='L' && b.h2h[a.team]==='W'){ arr[i]=b; arr[j]=a; }
     }
+    i = j+1; // jump past the whole tied group so a 3+ way tie's last pair isn't re-checked as if it were its own 2-way tie
   }
   arr.forEach((s,i)=> s.rank = i+1);
   const complete = ROUND_PATTERN.every((pair,idx)=> computeMatchResult(ensureMatch(pool.key, idx+1), pool.teams[pair[0]], pool.teams[pair[1]]).played);
@@ -993,17 +998,39 @@ function renderBracketGroup(label, colorClass, bracketKey, seeds, bm, courtNote,
     return '<div class="slot static'+(isWinner?' winner':'')+'">'+
       '<span><span class="seed">'+(seed?('#'+seed):'')+'</span>'+teamLink(name)+'</span>'+(isWinner?'&#10003;':'')+'</div>';
   };
+  // A slot that's null because it's waiting on a specific earlier match (not a genuine
+  // bye) names that match instead of leaking the raw null value into the page.
+  const waitingSlot = (feederX, feederY)=>{
+    if(feederX && feederY) return '<div class="slot placeholder-slot"><span>Winner of '+feederX+' v. '+feederY+' match</span></div>';
+    return '<div class="slot empty">TBD</div>';
+  };
   const statusFooter = (x, y, played, live, m)=>{
     if(isPlaceholder || x===null || y===null) return '';
     if(played) return '<div class="bmatch-score-line">'+scoreLineText(m)+'</div>';
     if(m && m.status==='live') return '<div class="bmatch-live-badge">LIVE</div>';
+    if(m && m.startTime) return '<div class="bmatch-time-badge">'+m.startTime+'</div>';
     return '';
+  };
+  // Finds the slot immediately before slotKey in its court's play order, if any —
+  // used so a not-yet-known work team can be named as "loser of that specific match".
+  const findPrevSlot = (slotKey)=>{
+    for(const seq of Object.values(BRACKET_COURT_PLAN[bracketKey])){
+      const idx = seq.indexOf(slotKey);
+      if(idx > 0) return seq[idx-1];
+    }
+    return null;
   };
   const workFooter = (slotKey, x, y)=>{
     if(x===null || y===null) return '';
     const w = work[slotKey];
     if(isPlaceholder) return '<div class="work-note bmatch-work-note">Work Team: '+w+'</div>';
-    return '<div class="work-note bmatch-work-note">'+(w ? 'Work Team: '+teamLink(w) : 'Work Team: TBD until the previous match on this court finishes')+'</div>';
+    if(w) return '<div class="work-note bmatch-work-note">Work Team: '+teamLink(w)+'</div>';
+    const prevKey = findPrevSlot(slotKey);
+    const prev = prevKey ? st[prevKey] : null;
+    if(prev && prev.x && prev.y){
+      return '<div class="work-note bmatch-work-note">Work Team: Loser of '+teamLink(prev.x)+' v. '+teamLink(prev.y)+' match</div>';
+    }
+    return '<div class="work-note bmatch-work-note">Work Team: TBD until the previous match on this court finishes</div>';
   };
   const courtTag = (slotKey)=> '<span class="bmatch-court"><span class="game-id">Game '+GAME_ID[slotKey]+'</span> &middot; '+courtLabel(SLOT_COURT[bracketKey][slotKey])+'</span>';
   let html = '<div class="bracket-group">';
@@ -1014,11 +1041,18 @@ function renderBracketGroup(label, colorClass, bracketKey, seeds, bm, courtNote,
   html += '<div class="bmatch">'+courtTag('qfB')+slot(st.qfB.x, st.qfB.xSeed, st.qfB.winner===st.qfB.x, false)+slot(st.qfB.y, st.qfB.ySeed, st.qfB.winner===st.qfB.y, false)+statusFooter(st.qfB.x, st.qfB.y, st.qfB.played, st.qfB.m.live, st.qfB.m)+workFooter('qfB', st.qfB.x, st.qfB.y)+'</div>';
 
   html += '<div class="round-label">Semifinal (seeds 1 &amp; 2 bye to here)</div>';
-  html += '<div class="bmatch">'+courtTag('sf1')+slot(st.sf1.x, st.sf1.xSeed, st.sf1.winner===st.sf1.x, !st.sf1.y)+slot(st.sf1.y, null, st.sf1.winner===st.sf1.y, !st.sf1.y)+statusFooter(st.sf1.x, st.sf1.y, st.sf1.played, st.sf1.m.live, st.sf1.m)+workFooter('sf1', st.sf1.x, st.sf1.y)+'</div>';
-  html += '<div class="bmatch">'+courtTag('sf2')+slot(st.sf2.x, st.sf2.xSeed, st.sf2.winner===st.sf2.x, !st.sf2.y)+slot(st.sf2.y, null, st.sf2.winner===st.sf2.y, !st.sf2.y)+statusFooter(st.sf2.x, st.sf2.y, st.sf2.played, st.sf2.m.live, st.sf2.m)+workFooter('sf2', st.sf2.x, st.sf2.y)+'</div>';
+  html += '<div class="bmatch">'+courtTag('sf1')+slot(st.sf1.x, st.sf1.xSeed, st.sf1.winner===st.sf1.x, !st.sf1.y)+
+    (isPlaceholder || st.sf1.y!==null ? slot(st.sf1.y, null, st.sf1.winner===st.sf1.y, !st.sf1.y) : waitingSlot(st.qfA.x, st.qfA.y))+
+    statusFooter(st.sf1.x, st.sf1.y, st.sf1.played, st.sf1.m.live, st.sf1.m)+workFooter('sf1', st.sf1.x, st.sf1.y)+'</div>';
+  html += '<div class="bmatch">'+courtTag('sf2')+slot(st.sf2.x, st.sf2.xSeed, st.sf2.winner===st.sf2.x, !st.sf2.y)+
+    (isPlaceholder || st.sf2.y!==null ? slot(st.sf2.y, null, st.sf2.winner===st.sf2.y, !st.sf2.y) : waitingSlot(st.qfB.x, st.qfB.y))+
+    statusFooter(st.sf2.x, st.sf2.y, st.sf2.played, st.sf2.m.live, st.sf2.m)+workFooter('sf2', st.sf2.x, st.sf2.y)+'</div>';
 
   html += '<div class="round-label">Final</div>';
-  html += '<div class="bmatch">'+courtTag('final')+slot(st.final.x, null, st.final.winner===st.final.x, !st.final.x)+slot(st.final.y, null, st.final.winner===st.final.y, !st.final.y)+statusFooter(st.final.x, st.final.y, st.final.played, st.final.m.live, st.final.m)+workFooter('final', st.final.x, st.final.y)+'</div>';
+  html += '<div class="bmatch">'+courtTag('final')+
+    (isPlaceholder || st.final.x!==null ? slot(st.final.x, null, st.final.winner===st.final.x, !st.final.x) : waitingSlot(st.sf1.x, st.sf1.y))+
+    (isPlaceholder || st.final.y!==null ? slot(st.final.y, null, st.final.winner===st.final.y, !st.final.y) : waitingSlot(st.sf2.x, st.sf2.y))+
+    statusFooter(st.final.x, st.final.y, st.final.played, st.final.m.live, st.final.m)+workFooter('final', st.final.x, st.final.y)+'</div>';
 
   if(!isPlaceholder && st.final.winner){
     html += '<div class="champ-banner"><div class="label">'+label+' Champion</div><div class="name">'+teamLink(st.final.winner)+'</div></div>';
