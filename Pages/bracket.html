@@ -487,7 +487,7 @@ function renderBracketPanel(label, colorClass, bKey, seeds, st, work){
 function render(){
   const grid = document.getElementById('bracketsGrid');
   if(!state.poolPlayComplete){
-    grid.innerHTML = '<div class="bracket-panel"><div class="empty-msg">Waiting for pool play to be marked complete&hellip; brackets will appear here automatically.<br><br>First bracket matches are estimated to begin around <strong>1:15 PM</strong>.</div></div>'.repeat(2);
+    grid.innerHTML = '<div class="bracket-panel"><div class="empty-msg">Waiting for pool play to be marked complete&hellip; brackets will appear here automatically.<br><br>First bracket matches are estimated to begin around <strong>3:00 PM</strong>.</div></div>'.repeat(2);
     return;
   }
   const { gold, silver } = getBracketSeeds();

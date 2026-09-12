@@ -459,17 +459,17 @@ function minutesToDisplay(mins){
   let h12 = h%12; if(h12===0) h12=12;
   return h12+':'+String(m).padStart(2,'0')+' '+ampm;
 }
-// Round 1 starts at 9:00 AM; every round after that starts 45 minutes later — unless
+// Round 1 starts at 9:00 AM; every round after that starts 60 minutes later — unless
 // state.poolTimeAdjust names a round to reset the clock at (e.g. running behind), in
-// which case every round from there onward is 45 min after the one before it, starting
+// which case every round from there onward is 60 min after the one before it, starting
 // from that adjusted time. Rounds before the adjusted one keep the original schedule.
 function roundTimeText(round){
   const adj = state.poolTimeAdjust;
   if(adj && adj.round && round >= adj.round){
     const adjStart = timeStrToMinutes(adj.time);
-    if(adjStart !== null) return minutesToDisplay(adjStart + (round - adj.round)*45);
+    if(adjStart !== null) return minutesToDisplay(adjStart + (round - adj.round)*60);
   }
-  return minutesToDisplay(9*60 + (round-1)*45);
+  return minutesToDisplay(9*60 + (round-1)*60);
 }
 function bracketSlotTimeText(bracketKey, slotKey){
   const startMins = timeStrToMinutes(state.bracketStartTime);
@@ -643,7 +643,7 @@ function renderPoolSection(){
       [1,2,3,4,5,6].map(r=>'<option value="'+r+'"'+(state.poolTimeAdjust.round===r?' selected':'')+'>Round '+r+'</option>').join('')+
     '</select>'+
     '<input type="time" id="poolAdjustTimeInput" value="'+(state.poolTimeAdjust.time||'')+'">'+
-    '<span class="pool-time-note">That round and every round after it start there, 45 min apart. Earlier rounds keep their original time.</span>'+
+    '<span class="pool-time-note">That round and every round after it start there, 60 min apart. Earlier rounds keep their original time.</span>'+
     '</div>';
   POOLS.forEach(pool=>{
     html += '<div class="court-card"><div class="court-head"><span class="pool-name">Pool '+pool.key+'</span><span class="court-tag">'+courtLabel(pool.court)+'</span></div>';

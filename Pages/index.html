@@ -697,14 +697,14 @@ function startLivePolling(){
 
 // ---------- TIME HELPERS ----------
 // ---------- MATCH RESULT CALC ----------
-// Round 1 starts at 9:00 AM; every round after that starts 45 minutes later.
+// Round 1 starts at 9:00 AM; every round after that starts 60 minutes later.
 function roundTimeText(round){
   const adj = state.poolTimeAdjust;
   if(adj && adj.round && round >= adj.round){
     const adjStart = timeStrToMinutes(adj.time);
-    if(adjStart !== null) return minutesToDisplay(adjStart + (round - adj.round)*45);
+    if(adjStart !== null) return minutesToDisplay(adjStart + (round - adj.round)*60);
   }
-  const totalMins = 9*60 + (round-1)*45;
+  const totalMins = 9*60 + (round-1)*60;
   let h = Math.floor(totalMins/60), m = totalMins%60;
   const ampm = h>=12 ? 'PM':'AM';
   let h12 = h%12; if(h12===0) h12=12;
@@ -1147,7 +1147,7 @@ function renderBracket(){
     html += 'Pool play isn\u2019t finished yet, so team names aren\u2019t locked in. This shows the bracket shape and which pool finish feeds each slot &mdash; not final seed order. The quarterfinal work-team assignments below are based on that same pool finish, so you can see roughly where you might be reffing in the afternoon, but they can still shift if final pool standings change. <span class="provisional-flag">Pool play in progress</span>';
   }
   html += '</div>';
-  html += '<div class="tiebreak-note" style="margin-bottom:16px;">First bracket matches are estimated to begin around <strong>1:15 PM</strong>, once pool play wraps up on all three courts. All three courts run bracket matches back to back with no gaps, except for the very last match of the day.</div>';
+  html += '<div class="tiebreak-note" style="margin-bottom:16px;">First bracket matches are estimated to begin around <strong>3:00 PM</strong>, once pool play wraps up on all three courts. All three courts run bracket matches back to back with no gaps, except for the very last match of the day.</div>';
   html += renderBracketGroup('Purple Bracket', 'purple', 'gold', gold, stByBracket, workByBracket, courtLabel(1)+' &amp; '+courtLabel(2), isPlaceholder);
   html += renderBracketGroup('Teal Bracket', 'teal', 'silver', silver, stByBracket, workByBracket, courtLabel(3)+' &amp; '+courtLabel(2), isPlaceholder);
   if(complete){

@@ -271,16 +271,16 @@ function minutesToDisplay(mins){
   let h12 = h%12; if(h12===0) h12=12;
   return h12+':'+String(m).padStart(2,'0')+' '+ampm;
 }
-// Round 1 starts at 9:00 AM; every round after that starts 45 minutes later — unless
+// Round 1 starts at 9:00 AM; every round after that starts 60 minutes later — unless
 // state.poolTimeAdjust names a round to reset the clock at (running behind schedule),
-// in which case that round and every round after it are 45 min apart starting there.
+// in which case that round and every round after it are 60 min apart starting there.
 function roundTimeText(round){
   const adj = state.poolTimeAdjust;
   if(adj && adj.round && round >= adj.round){
     const adjStart = timeStrToMinutes(adj.time);
-    if(adjStart !== null) return minutesToDisplay(adjStart + (round - adj.round)*45);
+    if(adjStart !== null) return minutesToDisplay(adjStart + (round - adj.round)*60);
   }
-  return minutesToDisplay(9*60 + (round-1)*45);
+  return minutesToDisplay(9*60 + (round-1)*60);
 }
 function computeMatchResult(m, teamA, teamB){
   const status = m.status || (m.live ? 'live' : 'upcoming');
