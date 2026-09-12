@@ -8,6 +8,67 @@
 <title>Live Bracket — Sophie Montez Memorial Tournament</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+  // --- Shared live-score storage, backed by Firebase Realtime Database ---
+  // Paste your project's config below (Firebase console > Project settings > General >
+  // "Your apps" > SDK setup and configuration > Config). This same object goes in all
+  // four files (tournament.html, scorekeeper.html, display.html, bracket-display.html).
+  const firebaseConfig = {
+    apiKey: "AIzaSyAX7YxKGh99GrBnyRftb0NL_wtL0bt7WXI",
+    authDomain: "ehs-volleyball.firebaseapp.com",
+    databaseURL: "https://ehs-volleyball-default-rtdb.firebaseio.com",
+    projectId: "ehs-volleyball",
+    storageBucket: "ehs-volleyball.firebasestorage.app",
+    messagingSenderId: "957400589340",
+    appId: "1:957400589340:web:32fa39dd4e23b69859ebd9"
+  };
+  let _fbDb = null;
+  try{
+    firebase.initializeApp(firebaseConfig);
+    _fbDb = firebase.database();
+  }catch(e){ console.error('Firebase init failed — check firebaseConfig at the top of this file', e); }
+
+  // Drop-in replacement for the old sandbox-only window.storage API. Nothing else in this
+  // file needs to change: .get/.set/.delete keep the exact same shape as before.
+  // Personal (shared:false) keys stay in this browser's localStorage.
+  // Shared (shared:true) keys sync live to every device through Firebase.
+  window.storage = {
+    async get(key, shared){
+      if(!shared){
+        const v = localStorage.getItem(key);
+        return v !== null ? { key, value:v, shared:false } : null;
+      }
+      if(!_fbDb) return null;
+      try{
+        const snap = await _fbDb.ref('shared/'+key).once('value');
+        const v = snap.val();
+        return (v!==null && v!==undefined) ? { key, value:v, shared:true } : null;
+      }catch(e){ return null; }
+    },
+    async set(key, value, shared){
+      if(!shared){
+        localStorage.setItem(key, value);
+        return { key, value, shared:false };
+      }
+      if(!_fbDb) return null;
+      try{
+        await _fbDb.ref('shared/'+key).set(value);
+        return { key, value, shared:true };
+      }catch(e){ return null; }
+    },
+    async delete(key, shared){
+      if(!shared){ localStorage.removeItem(key); return { key, deleted:true, shared:false }; }
+      if(!_fbDb) return null;
+      try{ await _fbDb.ref('shared/'+key).remove(); return { key, deleted:true, shared:true }; }
+      catch(e){ return null; }
+    },
+    async list(prefix, shared){
+      return { keys: [], prefix, shared: !!shared };
+    }
+  };
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
