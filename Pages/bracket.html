@@ -273,17 +273,20 @@ function ensureMatch(pool,round){
 }
 function computeMatchResult(m, teamA, teamB){
   const status = m.status || (m.live ? 'live' : 'upcoming');
-  let setsA=0,setsB=0;
+  let setsA=0,setsB=0,setsCounted=0;
   if(status === 'completed'){
     (m.sets||[]).forEach(s=>{
       if(s.a!=null && s.b!=null && !isNaN(s.a) && !isNaN(s.b) && (s.a>0||s.b>0)){
+        setsCounted++;
         if(s.a>s.b) setsA++; else if(s.b>s.a) setsB++;
       }
     });
   }
   let winner=null;
   if(setsA>setsB) winner=teamA; else if(setsB>setsA) winner=teamB;
-  return { setsA,setsB,winner,played: winner!==null };
+  const isTwoSetFormat = (m.sets||[]).length === 2;
+  const tied = isTwoSetFormat && winner===null && setsCounted===2;
+  return { setsA,setsB,winner,tied,played: winner!==null || tied };
 }
 function poolStandings(pool){
   const stats = {};
@@ -293,10 +296,11 @@ function poolStandings(pool){
     const teamA = pool.teams[pair[0]], teamB = pool.teams[pair[1]];
     const m = ensureMatch(pool.key, round);
     const r = computeMatchResult(m, teamA, teamB);
-    if(r.played){
+    if(r.played && !r.tied){
       if(r.winner===teamA){ stats[teamA].wins++; stats[teamB].losses++; stats[teamA].h2h[teamB]='W'; stats[teamB].h2h[teamA]='L'; }
       else { stats[teamB].wins++; stats[teamA].losses++; stats[teamB].h2h[teamA]='W'; stats[teamA].h2h[teamB]='L'; }
     }
+    // A tie contributes to sets/points above but no win, loss, or head-to-head result.
   });
   const arr = Object.values(stats);
   arr.sort((a,b)=> b.wins-a.wins);

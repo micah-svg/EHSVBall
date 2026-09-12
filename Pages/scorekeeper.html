@@ -278,10 +278,11 @@ function matchKey(pool,round){ return pool+'-r'+round; }
 // ('upcoming' | 'live' | 'completed'). This also transparently migrates any
 // older saved match shape (variable set counts, a boolean "live" flag) the
 // moment it's read, so nothing else has to know about the old format.
-function normalizeMatch(m){
+function normalizeMatch(m, setCount){
+  setCount = setCount || 3;
   const src = m || {};
-  let sets = Array.isArray(src.sets) ? src.sets.slice(0,3) : [];
-  while(sets.length < 3) sets.push({a:null,b:null});
+  let sets = Array.isArray(src.sets) ? src.sets.slice(0,setCount) : [];
+  while(sets.length < setCount) sets.push({a:null,b:null});
   sets = sets.map(s => ({
     a: (s && s.a!=null && s.a!=='') ? s.a : null,
     b: (s && s.b!=null && s.b!=='') ? s.b : null
@@ -294,20 +295,23 @@ function normalizeMatch(m){
 }
 function ensureMatch(pool,round){
   const k = matchKey(pool,round);
-  state.matches[k] = normalizeMatch(state.matches[k]);
+  // Pool play is capped at 2 sets — no third/deciding set.
+  state.matches[k] = normalizeMatch(state.matches[k], 2);
   return state.matches[k];
 }
 function ensureBracketMatch(bKey, slotKey){
   if(!state.bracketMatches[bKey]) state.bracketMatches[bKey] = {};
-  state.bracketMatches[bKey][slotKey] = normalizeMatch(state.bracketMatches[bKey][slotKey]);
+  // Bracket matches remain best-of-3.
+  state.bracketMatches[bKey][slotKey] = normalizeMatch(state.bracketMatches[bKey][slotKey], 3);
   return state.bracketMatches[bKey][slotKey];
 }
 
 function computeMatchResult(m, teamA, teamB){
-  let setsA=0,setsB=0,ptsA=0,ptsB=0;
+  let setsA=0,setsB=0,ptsA=0,ptsB=0,setsCounted=0;
   if(m.status === 'completed'){
     (m.sets||[]).forEach(s=>{
       if(s.a!=null && s.b!=null && !isNaN(s.a) && !isNaN(s.b) && (s.a>0||s.b>0)){
+        setsCounted++;
         ptsA+=Number(s.a); ptsB+=Number(s.b);
         if(s.a>s.b) setsA++; else if(s.b>s.a) setsB++;
       }
@@ -315,7 +319,11 @@ function computeMatchResult(m, teamA, teamB){
   }
   let winner=null;
   if(setsA>setsB) winner=teamA; else if(setsB>setsA) winner=teamB;
-  return { setsA,setsB,ptsA,ptsB,winner,played: winner!==null };
+  // Pool matches are capped at 2 sets (no third/deciding set). If they split 1-1, the
+  // match still counts as played, but with no winner — a genuine tie for standings.
+  const isTwoSetFormat = (m.sets||[]).length === 2;
+  const tied = isTwoSetFormat && winner===null && setsCounted===2;
+  return { setsA,setsB,ptsA,ptsB,winner,tied,played: winner!==null || tied };
 }
 function scoreLineText(m){
   return (m.sets||[])
@@ -336,10 +344,11 @@ function poolStandings(pool){
     stats[teamA].ptsW += r.ptsA; stats[teamA].ptsL += r.ptsB;
     stats[teamB].setsW += r.setsB; stats[teamB].setsL += r.setsA;
     stats[teamB].ptsW += r.ptsB; stats[teamB].ptsL += r.ptsA;
-    if(r.played){
+    if(r.played && !r.tied){
       if(r.winner===teamA){ stats[teamA].wins++; stats[teamB].losses++; stats[teamA].h2h[teamB]='W'; stats[teamB].h2h[teamA]='L'; }
       else { stats[teamB].wins++; stats[teamA].losses++; stats[teamB].h2h[teamA]='W'; stats[teamA].h2h[teamB]='L'; }
     }
+    // A tie contributes to sets/points above but no win, loss, or head-to-head result.
   });
   const arr = Object.values(stats).map(s=>({
     ...s,
@@ -555,7 +564,9 @@ function matchRowHtml(teamA, teamB, m, dataAttrs, extraNote){
   let html = '<div class="match-row">';
   if(extraNote) html += extraNote;
   html += '<div class="match-teams"><span>'+teamA+'</span><span class="vs">vs</span><span>'+teamB+'</span>';
-  if(status==='completed' && r.played){
+  if(status==='completed' && r.tied){
+    html += '<span class="result-tag pending">Tie</span>';
+  } else if(status==='completed' && r.played){
     const tag = r.winner===teamA ? teamA+' won' : teamB+' won';
     html += '<span class="result-tag win">'+tag+'</span>';
   } else if(status==='completed'){
@@ -573,7 +584,8 @@ function matchRowHtml(teamA, teamB, m, dataAttrs, extraNote){
     '<option value="completed"'+(status==='completed'?' selected':'')+'>Completed</option>'+
     '</select></div>';
   html += '<div class="set-inputs">';
-  for(let si=0; si<3; si++){
+  const setCount = (m.sets && m.sets.length) ? m.sets.length : 3;
+  for(let si=0; si<setCount; si++){
     const s = (m.sets && m.sets[si]) ? m.sets[si] : {a:null,b:null};
     html += '<div class="set-input-pair"><span class="set-label">S'+(si+1)+'</span>'+
       '<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" '+dataAttrs+' data-set="'+si+'" data-side="a" value="'+(s.a??'')+'">'+

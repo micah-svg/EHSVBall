@@ -267,10 +267,11 @@ function roundTimeText(round){
 }
 function computeMatchResult(m, teamA, teamB){
   const status = m.status || (m.live ? 'live' : 'upcoming');
-  let setsA=0,setsB=0,ptsA=0,ptsB=0;
+  let setsA=0,setsB=0,ptsA=0,ptsB=0,setsCounted=0;
   if(status === 'completed'){
     (m.sets||[]).forEach(s=>{
       if(s.a!=null && s.b!=null && !isNaN(s.a) && !isNaN(s.b) && (s.a>0||s.b>0)){
+        setsCounted++;
         ptsA+=Number(s.a); ptsB+=Number(s.b);
         if(s.a>s.b) setsA++; else if(s.b>s.a) setsB++;
       }
@@ -278,7 +279,11 @@ function computeMatchResult(m, teamA, teamB){
   }
   let winner=null;
   if(setsA>setsB) winner=teamA; else if(setsB>setsA) winner=teamB;
-  return { setsA,setsB,ptsA,ptsB,winner,played: winner!==null };
+  // Pool matches are capped at 2 sets (no third/deciding set). If they split 1-1, the
+  // match still counts as played, but with no winner — a genuine tie for standings.
+  const isTwoSetFormat = (m.sets||[]).length === 2;
+  const tied = isTwoSetFormat && winner===null && setsCounted===2;
+  return { setsA,setsB,ptsA,ptsB,winner,tied,played: winner!==null || tied };
 }
 function scoreLineText(m){
   return (m.sets||[])
@@ -299,10 +304,11 @@ function poolStandings(pool){
     stats[teamA].ptsW += r.ptsA; stats[teamA].ptsL += r.ptsB;
     stats[teamB].setsW += r.setsB; stats[teamB].setsL += r.setsA;
     stats[teamB].ptsW += r.ptsB; stats[teamB].ptsL += r.ptsA;
-    if(r.played){
+    if(r.played && !r.tied){
       if(r.winner===teamA){ stats[teamA].wins++; stats[teamB].losses++; stats[teamA].h2h[teamB]='W'; stats[teamB].h2h[teamA]='L'; }
       else { stats[teamB].wins++; stats[teamA].losses++; stats[teamB].h2h[teamA]='W'; stats[teamA].h2h[teamB]='L'; }
     }
+    // A tie contributes to sets/points above but no win, loss, or head-to-head result.
   });
   const arr = Object.values(stats).map(s=>({
     ...s,
@@ -337,7 +343,10 @@ function renderPoolColumn(pool){
     const workTeam = pool.teams[WORK_PATTERN[idx]];
     const courtColor = COURT_COLORS[pool.court];
     let statusHtml;
-    if(r.played){
+    if(r.tied){
+      statusHtml = '<span class="status pending">Tie</span>';
+      if(scoreLineText(m)) statusHtml += '<div class="score">'+scoreLineText(m)+'</div>';
+    } else if(r.played){
       const record = r.winner===teamA ? r.setsA+'-'+r.setsB : r.setsB+'-'+r.setsA;
       statusHtml = '<span class="status win">'+record+'</span>';
       if(scoreLineText(m)) statusHtml += '<div class="score">'+scoreLineText(m)+'</div>';
