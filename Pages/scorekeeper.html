@@ -12,23 +12,22 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
   // --- Shared live-score storage, backed by Firebase Realtime Database ---
-  // Paste your project's config below (Firebase console > Project settings > General >
-  // "Your apps" > SDK setup and configuration > Config). This same object goes in all
-  // four files (tournament.html, scorekeeper.html, display.html, bracket-display.html).
-  const firebaseConfig = {
-    apiKey: "AIzaSyAX7YxKGh99GrBnyRftb0NL_wtL0bt7WXI",
-    authDomain: "ehs-volleyball.firebaseapp.com",
-    databaseURL: "https://ehs-volleyball-default-rtdb.firebaseio.com",
-    projectId: "ehs-volleyball",
-    storageBucket: "ehs-volleyball.firebasestorage.app",
-    messagingSenderId: "957400589340",
-    appId: "1:957400589340:web:32fa39dd4e23b69859ebd9"
-  };
+  // firebaseConfig is provided by Netlify's Snippet Injection at serve time (built from
+  // Post-processing-scoped environment variables) — see the setup notes wherever this
+  // project's deploy docs live. Locally, firebase-config.js (gitignored) can define the
+  // same global for testing. Init is lazy (getDb(), below) so it doesn't matter whether
+  // firebaseConfig is defined by an injected snippet, a local file, or anything else, as
+  // long as it exists by the time a save/load actually happens.
   let _fbDb = null;
-  try{
-    firebase.initializeApp(firebaseConfig);
-    _fbDb = firebase.database();
-  }catch(e){ console.error('Firebase init failed — check firebaseConfig at the top of this file', e); }
+  function getDb(){
+    if(_fbDb) return _fbDb;
+    try{
+      if(typeof firebaseConfig === 'undefined') throw new Error('firebaseConfig is not defined');
+      if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+      _fbDb = firebase.database();
+    }catch(e){ console.error('Firebase init failed — is firebaseConfig defined?', e); }
+    return _fbDb;
+  }
 
   // Drop-in replacement for the old sandbox-only window.storage API. Nothing else in this
   // file needs to change: .get/.set/.delete keep the exact same shape as before.
@@ -40,9 +39,10 @@
         const v = localStorage.getItem(key);
         return v !== null ? { key, value:v, shared:false } : null;
       }
-      if(!_fbDb) return null;
+      const db = getDb();
+      if(!db) return null;
       try{
-        const snap = await _fbDb.ref('shared/'+key).once('value');
+        const snap = await db.ref('shared/'+key).once('value');
         const v = snap.val();
         return (v!==null && v!==undefined) ? { key, value:v, shared:true } : null;
       }catch(e){ return null; }
@@ -52,16 +52,18 @@
         localStorage.setItem(key, value);
         return { key, value, shared:false };
       }
-      if(!_fbDb) return null;
+      const db = getDb();
+      if(!db) return null;
       try{
-        await _fbDb.ref('shared/'+key).set(value);
+        await db.ref('shared/'+key).set(value);
         return { key, value, shared:true };
       }catch(e){ return null; }
     },
     async delete(key, shared){
       if(!shared){ localStorage.removeItem(key); return { key, deleted:true, shared:false }; }
-      if(!_fbDb) return null;
-      try{ await _fbDb.ref('shared/'+key).remove(); return { key, deleted:true, shared:true }; }
+      const db = getDb();
+      if(!db) return null;
+      try{ await db.ref('shared/'+key).remove(); return { key, deleted:true, shared:true }; }
       catch(e){ return null; }
     },
     async list(prefix, shared){
@@ -87,7 +89,7 @@
   html{ -webkit-text-size-adjust:100%; }
   body{
     margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',sans-serif;
-    -webkit-font-smoothing:antialiased; padding-bottom:calc(60px + env(safe-area-inset-bottom));
+    -webkit-font-smoothing:antialiased; padding-bottom:calc(74px + env(safe-area-inset-bottom));
     overflow-x:hidden;
   }
   h1,h2,h3,.num{font-family:'Oswald',sans-serif;}
@@ -136,8 +138,14 @@
   .set-input-pair input{ width:38px; border:none; background:none; text-align:center; font-family:'Oswald'; font-size:16px; color:var(--ink); padding:4px 0; }
   .set-input-pair span{ color:var(--sub); font-size:12px; }
   .set-label{ font-size:10px; color:var(--sub); text-transform:uppercase; letter-spacing:0.3px; margin-right:2px; }
-  .live-toggle{ background:var(--navy); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-size:11px; font-family:'Inter'; cursor:pointer; margin-left:auto; }
-  .live-toggle.active{ background:#C0392B; }
+  .status-row{ margin-bottom:8px; }
+  .status-select{
+    font-family:'Inter'; font-size:13px; font-weight:600; padding:8px 10px; border-radius:8px;
+    border:1.5px solid var(--line); background:#fff; color:var(--ink); appearance:auto;
+  }
+  .status-select.status-upcoming{ border-color:var(--pending); color:var(--pending); }
+  .status-select.status-live{ border-color:#C0392B; color:#C0392B; }
+  .status-select.status-completed{ border-color:var(--win); color:var(--win); }
   .bye-row{ padding:12px 14px; color:var(--sub); font-style:italic; font-size:13px; }
   .court-context{
     display:flex; justify-content:space-between; align-items:center; padding:6px 14px;
@@ -154,6 +162,22 @@
   .bracket-group-head h2{ font-size:16px; margin:0; }
 
   .footer-actions{ margin-top:28px; padding-top:16px; border-top:1px solid var(--line); display:flex; justify-content:center; }
+
+  .save-bar{
+    position:fixed; left:0; right:0; bottom:0; z-index:30;
+    background:#fff; border-top:1px solid var(--line);
+    padding:10px 18px calc(10px + env(safe-area-inset-bottom)) 18px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    box-shadow:0 -2px 10px rgba(0,0,0,0.08);
+  }
+  .save-note{ font-size:12px; color:var(--sub); }
+  .btn-save{
+    border:none; border-radius:8px; padding:12px 24px; font-family:'Oswald'; font-size:15px;
+    font-weight:600; cursor:pointer; background:var(--pending); color:#fff; transition:background 0.2s;
+  }
+  .btn-save:disabled{ cursor:default; }
+  .btn-save.dirty{ background:var(--gold); cursor:pointer; animation:saveGlow 1.6s ease-in-out infinite; }
+  @keyframes saveGlow{ 0%,100%{ box-shadow:0 0 0 0 rgba(232,116,158,0.5); } 50%{ box-shadow:0 0 0 8px rgba(232,116,158,0); } }
 </style>
 </head>
 <body>
@@ -173,6 +197,11 @@
     <button class="btn btn-danger" id="resetBtn">Reset entire tournament</button>
   </div>
 </main>
+
+<div class="save-bar">
+  <div class="save-note" id="saveNote">Everything is saved</div>
+  <button class="btn-save" id="saveBtn" disabled>Saved</button>
+</div>
 
 <script>
 // ---------- DATA MODEL (mirrors the public page) ----------
@@ -195,26 +224,45 @@ let state = {
 };
 
 function matchKey(pool,round){ return pool+'-r'+round; }
+// Every match is normalized to exactly 3 sets plus an explicit status
+// ('upcoming' | 'live' | 'completed'). This also transparently migrates any
+// older saved match shape (variable set counts, a boolean "live" flag) the
+// moment it's read, so nothing else has to know about the old format.
+function normalizeMatch(m){
+  const src = m || {};
+  let sets = Array.isArray(src.sets) ? src.sets.slice(0,3) : [];
+  while(sets.length < 3) sets.push({a:null,b:null});
+  sets = sets.map(s => ({
+    a: (s && s.a!=null && s.a!=='') ? s.a : null,
+    b: (s && s.b!=null && s.b!=='') ? s.b : null
+  }));
+  let status = src.status;
+  if(status!=='upcoming' && status!=='live' && status!=='completed'){
+    status = src.live ? 'live' : 'upcoming';
+  }
+  return { sets, status };
+}
 function ensureMatch(pool,round){
   const k = matchKey(pool,round);
-  if(!state.matches[k]) state.matches[k] = { sets:[{a:null,b:null}], live:false };
+  state.matches[k] = normalizeMatch(state.matches[k]);
   return state.matches[k];
 }
 function ensureBracketMatch(bKey, slotKey){
   if(!state.bracketMatches[bKey]) state.bracketMatches[bKey] = {};
-  if(!state.bracketMatches[bKey][slotKey]) state.bracketMatches[bKey][slotKey] = { sets:[{a:null,b:null}], live:false };
+  state.bracketMatches[bKey][slotKey] = normalizeMatch(state.bracketMatches[bKey][slotKey]);
   return state.bracketMatches[bKey][slotKey];
 }
 
 function computeMatchResult(m, teamA, teamB){
-  let setsA=0,setsB=0,ptsA=0,ptsB=0,played=false;
-  (m.sets||[]).forEach(s=>{
-    if(s.a!=null && s.b!=null && !isNaN(s.a) && !isNaN(s.b) && (s.a>0||s.b>0)){
-      played=true;
-      ptsA+=Number(s.a); ptsB+=Number(s.b);
-      if(s.a>s.b) setsA++; else if(s.b>s.a) setsB++;
-    }
-  });
+  let setsA=0,setsB=0,ptsA=0,ptsB=0;
+  if(m.status === 'completed'){
+    (m.sets||[]).forEach(s=>{
+      if(s.a!=null && s.b!=null && !isNaN(s.a) && !isNaN(s.b) && (s.a>0||s.b>0)){
+        ptsA+=Number(s.a); ptsB+=Number(s.b);
+        if(s.a>s.b) setsA++; else if(s.b>s.a) setsB++;
+      }
+    });
+  }
   let winner=null;
   if(setsA>setsB) winner=teamA; else if(setsB>setsA) winner=teamB;
   return { setsA,setsB,ptsA,ptsB,winner,played: winner!==null };
@@ -301,7 +349,7 @@ function bracketStructure(seeds, bm){
   };
 }
 function ensureBracketMatchIn(bm, slotKey){
-  if(!bm[slotKey]) bm[slotKey] = { sets:[{a:null,b:null}], live:false };
+  bm[slotKey] = normalizeMatch(bm[slotKey]);
   return bm[slotKey];
 }
 
@@ -345,7 +393,12 @@ function computeWorkTeams(st, bracketKey, seeds){
 }
 
 // ---------- PERSISTENCE ----------
+// Editing a score or status only updates this device's local state (see markDirty
+// below) — nothing reaches Firebase until the Save button is pressed. This avoids a
+// flurry of writes while you're mid-entry and gives you control over exactly when
+// the public site and TV displays update.
 let lastSnapshot = null;
+let dirty = false;
 async function loadState(){
   try{
     const res = await window.storage.get('tournament-data', true);
@@ -358,22 +411,47 @@ async function loadState(){
     }
   }catch(e){ /* nothing saved yet */ }
 }
-let saveTimer=null;
-function saveData(){
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(async ()=>{
-    const payload = JSON.stringify({ matches:state.matches, bracketMatches:state.bracketMatches, poolPlayComplete:state.poolPlayComplete });
-    lastSnapshot = payload;
-    try{ await window.storage.set('tournament-data', payload, true); }
-    catch(e){ console.error('save failed', e); }
-  }, 150);
+function markDirty(){
+  dirty = true;
+  updateSaveBar();
 }
-// Poll for changes from other scorekeeper devices, but never while this device has an
-// input focused (so we don't clobber someone actively typing a score).
+function updateSaveBar(){
+  const btn = document.getElementById('saveBtn');
+  const note = document.getElementById('saveNote');
+  if(!btn) return;
+  if(dirty){
+    btn.textContent = 'Save changes';
+    btn.classList.add('dirty');
+    btn.disabled = false;
+    if(note) note.textContent = 'You have unsaved changes';
+  } else {
+    btn.textContent = 'Saved';
+    btn.classList.remove('dirty');
+    btn.disabled = true;
+    if(note) note.textContent = 'Everything is saved';
+  }
+}
+async function saveNow(){
+  const btn = document.getElementById('saveBtn');
+  if(btn){ btn.textContent = 'Saving…'; btn.disabled = true; }
+  const payload = JSON.stringify({ matches:state.matches, bracketMatches:state.bracketMatches, poolPlayComplete:state.poolPlayComplete });
+  const res = await window.storage.set('tournament-data', payload, true);
+  if(res){
+    lastSnapshot = payload;
+    dirty = false;
+    updateSaveBar();
+  } else {
+    alert('Save failed — check your connection and try again.');
+    updateSaveBar();
+  }
+}
+// Poll for changes from other scorekeeper devices, but never while this device has
+// unsaved local edits, or an input/select focused (so we don't clobber active work).
 function startPolling(){
   setInterval(async ()=>{
+    if(dirty) return;
     const active = document.activeElement;
-    if(active && (active.tagName==='INPUT')) return;
+    if(active && (active.tagName==='INPUT' || active.tagName==='SELECT')) return;
     try{
       const res = await window.storage.get('tournament-data', true);
       if(res && res.value && res.value !== lastSnapshot){
@@ -387,33 +465,44 @@ function startPolling(){
     }catch(e){ /* skip this tick */ }
   }, 10000);
 }
+window.addEventListener('beforeunload', (e)=>{
+  if(dirty){ e.preventDefault(); e.returnValue = ''; }
+});
 
 // ---------- RENDER: a single editable match row (shared by pool & bracket) ----------
 function matchRowHtml(teamA, teamB, m, dataAttrs, extraNote){
   if(teamA===null || teamB===null) return '';
   const r = computeMatchResult(m, teamA, teamB);
+  const status = m.status || 'upcoming';
   let html = '<div class="match-row">';
   if(extraNote) html += extraNote;
   html += '<div class="match-teams"><span>'+teamA+'</span><span class="vs">vs</span><span>'+teamB+'</span>';
-  if(r.played){
+  if(status==='completed' && r.played){
     const tag = r.winner===teamA ? teamA+' won' : teamB+' won';
     html += '<span class="result-tag win">'+tag+'</span>';
-  } else if(m.live){
+  } else if(status==='completed'){
+    html += '<span class="result-tag pending">Completed</span>';
+  } else if(status==='live'){
     html += '<span class="result-tag live">LIVE</span>';
   } else {
-    html += '<span class="result-tag pending">Not played</span>';
+    html += '<span class="result-tag pending">Upcoming</span>';
   }
   html += '</div>';
+  const statusAttrs = dataAttrs.replace('data-target', 'data-status-target');
+  html += '<div class="status-row"><select class="status-select status-'+status+'" '+statusAttrs+'>'+
+    '<option value="upcoming"'+(status==='upcoming'?' selected':'')+'>Upcoming</option>'+
+    '<option value="live"'+(status==='live'?' selected':'')+'>Live</option>'+
+    '<option value="completed"'+(status==='completed'?' selected':'')+'>Completed</option>'+
+    '</select></div>';
   html += '<div class="set-inputs">';
-  (m.sets||[]).forEach((s,si)=>{
+  for(let si=0; si<3; si++){
+    const s = (m.sets && m.sets[si]) ? m.sets[si] : {a:null,b:null};
     html += '<div class="set-input-pair"><span class="set-label">S'+(si+1)+'</span>'+
       '<input type="number" min="0" max="99" inputmode="numeric" pattern="[0-9]*" '+dataAttrs+' data-set="'+si+'" data-side="a" value="'+(s.a??'')+'">'+
       '<span>-</span>'+
       '<input type="number" min="0" max="99" inputmode="numeric" pattern="[0-9]*" '+dataAttrs+' data-set="'+si+'" data-side="b" value="'+(s.b??'')+'">'+
       '</div>';
-  });
-  html += '<div class="set-input-pair" style="cursor:pointer;" '+dataAttrs.replace('data-target','data-add-set-target')+'><span style="color:var(--sub);font-size:12px;">+ set</span></div>';
-  html += '<button class="live-toggle'+(m.live?' active':'')+'" '+dataAttrs.replace('data-target','data-live-target')+'>'+(m.live?'Unmark live':'Mark live')+'</button>';
+  }
   html += '</div></div>';
   return html;
 }
@@ -507,7 +596,7 @@ document.addEventListener('input', (e)=>{
     const { pool, round, set, side } = t.dataset;
     const m = ensureMatch(pool, Number(round));
     m.sets[Number(set)][side] = t.value === '' ? null : Number(t.value);
-    saveData();
+    markDirty();
     renderPoolSection();
     renderStatusAndBracket();
     // restore focus so typing isn't interrupted by the re-render
@@ -519,7 +608,7 @@ document.addEventListener('input', (e)=>{
     const { bkey, slot, set, side } = t.dataset;
     const m = ensureBracketMatch(bkey, slot);
     m.sets[Number(set)][side] = t.value === '' ? null : Number(t.value);
-    saveData();
+    markDirty();
     renderStatusAndBracket();
     const sel = 'input[data-target="bracket"][data-bkey="'+bkey+'"][data-slot="'+slot+'"][data-set="'+set+'"][data-side="'+side+'"]';
     const el = document.querySelector(sel);
@@ -527,45 +616,29 @@ document.addEventListener('input', (e)=>{
   }
 });
 
+document.addEventListener('change', (e)=>{
+  const t = e.target;
+  if(t.matches('select[data-status-target="pool"]')){
+    const { pool, round } = t.dataset;
+    const m = ensureMatch(pool, Number(round));
+    m.status = t.value;
+    markDirty();
+    renderPoolSection();
+    renderStatusAndBracket();
+  }
+  if(t.matches('select[data-status-target="bracket"]')){
+    const { bkey, slot } = t.dataset;
+    const m = ensureBracketMatch(bkey, slot);
+    m.status = t.value;
+    markDirty();
+    renderStatusAndBracket();
+  }
+});
+
 document.addEventListener('click', (e)=>{
-  // add set (pool)
-  const addPool = e.target.closest('[data-add-set-target="pool"]');
-  if(addPool){
-    const { pool, round } = addPool.dataset;
-    const m = ensureMatch(pool, Number(round));
-    if(m.sets.length<5) m.sets.push({a:null,b:null});
-    saveData();
-    renderPoolSection();
-    return;
-  }
-  // add set (bracket)
-  const addBracket = e.target.closest('[data-add-set-target="bracket"]');
-  if(addBracket){
-    const { bkey, slot } = addBracket.dataset;
-    const m = ensureBracketMatch(bkey, slot);
-    if(m.sets.length<5) m.sets.push({a:null,b:null});
-    saveData();
-    renderStatusAndBracket();
-    return;
-  }
-  // live toggle (pool)
-  const livePool = e.target.closest('[data-live-target="pool"]');
-  if(livePool){
-    const { pool, round } = livePool.dataset;
-    const m = ensureMatch(pool, Number(round));
-    m.live = !m.live;
-    saveData();
-    renderPoolSection();
-    return;
-  }
-  // live toggle (bracket)
-  const liveBracket = e.target.closest('[data-live-target="bracket"]');
-  if(liveBracket){
-    const { bkey, slot } = liveBracket.dataset;
-    const m = ensureBracketMatch(bkey, slot);
-    m.live = !m.live;
-    saveData();
-    renderStatusAndBracket();
+  // save everything to Firebase
+  if(e.target.id==='saveBtn'){
+    saveNow();
     return;
   }
   // complete pool play
@@ -575,7 +648,7 @@ document.addEventListener('click', (e)=>{
       if(!confirm('Not every pool match has a result yet. Mark pool play complete anyway? You can reopen it later if needed.')) return;
     }
     state.poolPlayComplete = true;
-    saveData();
+    markDirty();
     renderAll();
     document.getElementById('bracket-section').scrollIntoView({ behavior:'smooth', block:'start' });
     return;
@@ -584,18 +657,18 @@ document.addEventListener('click', (e)=>{
   if(e.target.id==='reopenPoolBtn'){
     if(confirm('Reopen pool play? The bracket below will show as locked again until you complete pool play a second time.')){
       state.poolPlayComplete = false;
-      saveData();
+      markDirty();
       renderAll();
     }
     return;
   }
   // reset everything
   if(e.target.id==='resetBtn'){
-    if(confirm('This clears every pool score, bracket score, and the pool-play-complete status for everyone. Are you sure?')){
+    if(confirm('This clears every pool score, bracket score, and the pool-play-complete status for everyone. Are you sure? This still won\u2019t reach the public site until you hit Save.')){
       state.matches = {};
       state.bracketMatches = { gold:{}, silver:{} };
       state.poolPlayComplete = false;
-      saveData();
+      markDirty();
       renderAll();
     }
     return;
@@ -606,6 +679,7 @@ document.addEventListener('click', (e)=>{
 (async function init(){
   await loadState();
   renderAll();
+  updateSaveBar();
   startPolling();
 })();
 </script>

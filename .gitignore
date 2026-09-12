@@ -1,0 +1,14 @@
+# Keeps the Firebase project config out of git history.
+# NOTE: this only stops git from tracking the file — it does NOT stop Netlify
+# from needing it. A browser has to load this file at runtime to initialize
+# Firebase, so:
+#   - If you deploy by dragging the project folder into Netlify (or via
+#     `netlify deploy` from this folder), it works as-is: gitignore only
+#     affects git, not what's on disk, so the file still gets uploaded.
+#   - If Netlify is connected to this repo on GitHub and auto-deploys on
+#     push, this file will NOT reach Netlify, since it never reaches GitHub.
+#     In that case, either add it directly in the Netlify UI (Site
+#     configuration > Deploys > Post processing, or drag-and-drop a manual
+#     deploy alongside your git-based one), or move these values into
+#     Netlify's environment variables and inject them at build time instead.
+firebase-config.js

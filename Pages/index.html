@@ -14,23 +14,22 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
   // --- Shared live-score storage, backed by Firebase Realtime Database ---
-  // Paste your project's config below (Firebase console > Project settings > General >
-  // "Your apps" > SDK setup and configuration > Config). This same object goes in all
-  // four files (tournament.html, scorekeeper.html, display.html, bracket-display.html).
-  const firebaseConfig = {
-    apiKey: "AIzaSyAX7YxKGh99GrBnyRftb0NL_wtL0bt7WXI",
-    authDomain: "ehs-volleyball.firebaseapp.com",
-    databaseURL: "https://ehs-volleyball-default-rtdb.firebaseio.com",
-    projectId: "ehs-volleyball",
-    storageBucket: "ehs-volleyball.firebasestorage.app",
-    messagingSenderId: "957400589340",
-    appId: "1:957400589340:web:32fa39dd4e23b69859ebd9"
-  };
+  // firebaseConfig is provided by Netlify's Snippet Injection at serve time (built from
+  // Post-processing-scoped environment variables) — see the setup notes wherever this
+  // project's deploy docs live. Locally, firebase-config.js (gitignored) can define the
+  // same global for testing. Init is lazy (getDb(), below) so it doesn't matter whether
+  // firebaseConfig is defined by an injected snippet, a local file, or anything else, as
+  // long as it exists by the time a save/load actually happens.
   let _fbDb = null;
-  try{
-    firebase.initializeApp(firebaseConfig);
-    _fbDb = firebase.database();
-  }catch(e){ console.error('Firebase init failed — check firebaseConfig at the top of this file', e); }
+  function getDb(){
+    if(_fbDb) return _fbDb;
+    try{
+      if(typeof firebaseConfig === 'undefined') throw new Error('firebaseConfig is not defined');
+      if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+      _fbDb = firebase.database();
+    }catch(e){ console.error('Firebase init failed — is firebaseConfig defined?', e); }
+    return _fbDb;
+  }
 
   // Drop-in replacement for the old sandbox-only window.storage API. Nothing else in this
   // file needs to change: .get/.set/.delete keep the exact same shape as before.
@@ -42,9 +41,10 @@
         const v = localStorage.getItem(key);
         return v !== null ? { key, value:v, shared:false } : null;
       }
-      if(!_fbDb) return null;
+      const db = getDb();
+      if(!db) return null;
       try{
-        const snap = await _fbDb.ref('shared/'+key).once('value');
+        const snap = await db.ref('shared/'+key).once('value');
         const v = snap.val();
         return (v!==null && v!==undefined) ? { key, value:v, shared:true } : null;
       }catch(e){ return null; }
@@ -54,16 +54,18 @@
         localStorage.setItem(key, value);
         return { key, value, shared:false };
       }
-      if(!_fbDb) return null;
+      const db = getDb();
+      if(!db) return null;
       try{
-        await _fbDb.ref('shared/'+key).set(value);
+        await db.ref('shared/'+key).set(value);
         return { key, value, shared:true };
       }catch(e){ return null; }
     },
     async delete(key, shared){
       if(!shared){ localStorage.removeItem(key); return { key, deleted:true, shared:false }; }
-      if(!_fbDb) return null;
-      try{ await _fbDb.ref('shared/'+key).remove(); return { key, deleted:true, shared:true }; }
+      const db = getDb();
+      if(!db) return null;
+      try{ await db.ref('shared/'+key).remove(); return { key, deleted:true, shared:true }; }
       catch(e){ return null; }
     },
     async list(prefix, shared){
