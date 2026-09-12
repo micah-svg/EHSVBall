@@ -269,7 +269,15 @@ const SLOT_COURT = {
 };
 const GAME_ID = { qfA:1, qfB:2, sf1:3, sf2:4, final:5 };
 
-let state = { poolPlayComplete:true, matches:{}, bracketMatches:{ gold:{}, silver:{} }, bracketStartTime:'16:00' };
+let state = { poolPlayComplete:true, matches:{}, bracketMatches:{
+  gold:{
+    qfA:{status:'completed', sets:[{a:25,b:12},{a:25,b:14},{a:null,b:null}]},   // Banks (x) beat Madras (y)
+    qfB:{status:'completed', sets:[{a:16,b:25},{a:22,b:25},{a:null,b:null}]}    // Scappoose (x) lost to Junction City (y)
+  },
+  silver:{
+    qfA:{status:'completed', sets:[{a:25,b:16},{a:25,b:10},{a:null,b:null}]}    // Philomath (x) beat Ontario (y)
+  }
+}, bracketStartTime:'16:00' };
 
 function ensureMatch(pool,round){
   const k = pool+'-r'+round;
@@ -451,9 +459,13 @@ function gameTag(bKey, slotKey){
   return '<div class="matchup-tag">Game '+GAME_ID[slotKey]+' &middot; <span style="color:'+COURT_COLORS[court]+'">'+COURT_NAMES[court]+'</span>'+
     (timeText ? ' <span class="matchup-time">'+timeText+'</span>' : '')+'</div>';
 }
-function workLineHtml(slotKey, x, y, work){
+// Manual exception: Molalla works Silver's QF-A instead of whoever the normal
+// rotation would compute, per a specific override for this bracket.
+const WORK_TEAM_OVERRIDES = { silver: { qfA: 'Molalla' } };
+function workLineHtml(bKey, slotKey, x, y, work){
   if(x===null || y===null) return '';
-  const w = work[slotKey];
+  const override = WORK_TEAM_OVERRIDES[bKey] && WORK_TEAM_OVERRIDES[bKey][slotKey];
+  const w = override || work[slotKey];
   return '<div class="matchup-work">'+(w ? 'Work Team: '+w : 'Work Team: TBD') +'</div>';
 }
 
@@ -467,21 +479,21 @@ function renderBracketPanel(label, colorClass, bKey, seeds, st, work){
   html += '<div class="round round1">';
   html += '<div class="pair">';
   html += '<div class="matchup">'+teamRowHtml(seeds.find(s=>s.seed===1)?.team||null, true, false)+teamRowHtml(null,false,true)+'</div>';
-  html += '<div class="matchup">'+gameTag(bKey,'qfA')+teamRowHtml(st.qfA.x, st.qfA.winner===st.qfA.x, false)+teamRowHtml(st.qfA.y, st.qfA.winner===st.qfA.y, false)+matchupFootHtml(st.qfA.x, st.qfA.y, st.qfA.played, st.qfA.m.status==='live', st.qfA.setsA, st.qfA.setsB, st.qfA.m.startTime, st.qfA.m)+workLineHtml('qfA', st.qfA.x, st.qfA.y, work)+'</div>';
+  html += '<div class="matchup">'+gameTag(bKey,'qfA')+teamRowHtml(st.qfA.x, st.qfA.winner===st.qfA.x, false)+teamRowHtml(st.qfA.y, st.qfA.winner===st.qfA.y, false)+matchupFootHtml(st.qfA.x, st.qfA.y, st.qfA.played, st.qfA.m.status==='live', st.qfA.setsA, st.qfA.setsB, st.qfA.m.startTime, st.qfA.m)+workLineHtml(bKey, 'qfA', st.qfA.x, st.qfA.y, work)+'</div>';
   html += '</div>';
   html += '<div class="pair">';
-  html += '<div class="matchup">'+gameTag(bKey,'qfB')+teamRowHtml(st.qfB.x, st.qfB.winner===st.qfB.x, false)+teamRowHtml(st.qfB.y, st.qfB.winner===st.qfB.y, false)+matchupFootHtml(st.qfB.x, st.qfB.y, st.qfB.played, st.qfB.m.status==='live', st.qfB.setsA, st.qfB.setsB, st.qfB.m.startTime, st.qfB.m)+workLineHtml('qfB', st.qfB.x, st.qfB.y, work)+'</div>';
+  html += '<div class="matchup">'+gameTag(bKey,'qfB')+teamRowHtml(st.qfB.x, st.qfB.winner===st.qfB.x, false)+teamRowHtml(st.qfB.y, st.qfB.winner===st.qfB.y, false)+matchupFootHtml(st.qfB.x, st.qfB.y, st.qfB.played, st.qfB.m.status==='live', st.qfB.setsA, st.qfB.setsB, st.qfB.m.startTime, st.qfB.m)+workLineHtml(bKey, 'qfB', st.qfB.x, st.qfB.y, work)+'</div>';
   html += '<div class="matchup">'+teamRowHtml(seeds.find(s=>s.seed===2)?.team||null, true, false)+teamRowHtml(null,false,true)+'</div>';
   html += '</div>';
   html += '</div>';
 
   html += '<div class="round round2"><div class="pair">';
-  html += '<div class="matchup">'+gameTag(bKey,'sf1')+teamRowHtml(st.sf1.x, st.sf1.winner===st.sf1.x, false)+teamRowHtml(st.sf1.y, st.sf1.winner===st.sf1.y, false)+matchupFootHtml(st.sf1.x, st.sf1.y, st.sf1.played, st.sf1.m.status==='live', st.sf1.setsA, st.sf1.setsB, st.sf1.m.startTime, st.sf1.m)+workLineHtml('sf1', st.sf1.x, st.sf1.y, work)+'</div>';
-  html += '<div class="matchup">'+gameTag(bKey,'sf2')+teamRowHtml(st.sf2.x, st.sf2.winner===st.sf2.x, false)+teamRowHtml(st.sf2.y, st.sf2.winner===st.sf2.y, false)+matchupFootHtml(st.sf2.x, st.sf2.y, st.sf2.played, st.sf2.m.status==='live', st.sf2.setsA, st.sf2.setsB, st.sf2.m.startTime, st.sf2.m)+workLineHtml('sf2', st.sf2.x, st.sf2.y, work)+'</div>';
+  html += '<div class="matchup">'+gameTag(bKey,'sf1')+teamRowHtml(st.sf1.x, st.sf1.winner===st.sf1.x, false)+teamRowHtml(st.sf1.y, st.sf1.winner===st.sf1.y, false)+matchupFootHtml(st.sf1.x, st.sf1.y, st.sf1.played, st.sf1.m.status==='live', st.sf1.setsA, st.sf1.setsB, st.sf1.m.startTime, st.sf1.m)+workLineHtml(bKey, 'sf1', st.sf1.x, st.sf1.y, work)+'</div>';
+  html += '<div class="matchup">'+gameTag(bKey,'sf2')+teamRowHtml(st.sf2.x, st.sf2.winner===st.sf2.x, false)+teamRowHtml(st.sf2.y, st.sf2.winner===st.sf2.y, false)+matchupFootHtml(st.sf2.x, st.sf2.y, st.sf2.played, st.sf2.m.status==='live', st.sf2.setsA, st.sf2.setsB, st.sf2.m.startTime, st.sf2.m)+workLineHtml(bKey, 'sf2', st.sf2.x, st.sf2.y, work)+'</div>';
   html += '</div></div>';
 
   html += '<div class="round round3">';
-  html += '<div class="matchup">'+gameTag(bKey,'final')+teamRowHtml(st.final.x, st.final.winner===st.final.x, false)+teamRowHtml(st.final.y, st.final.winner===st.final.y, false)+matchupFootHtml(st.final.x, st.final.y, st.final.played, st.final.m.status==='live', st.final.setsA, st.final.setsB, st.final.m.startTime, st.final.m)+workLineHtml('final', st.final.x, st.final.y, work)+'</div>';
+  html += '<div class="matchup">'+gameTag(bKey,'final')+teamRowHtml(st.final.x, st.final.winner===st.final.x, false)+teamRowHtml(st.final.y, st.final.winner===st.final.y, false)+matchupFootHtml(st.final.x, st.final.y, st.final.played, st.final.m.status==='live', st.final.setsA, st.final.setsB, st.final.m.startTime, st.final.m)+workLineHtml(bKey, 'final', st.final.x, st.final.y, work)+'</div>';
   html += '</div>';
 
   html += '<div class="round round4">';
