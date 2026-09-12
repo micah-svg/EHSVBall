@@ -373,8 +373,8 @@ function renderPoolColumn(pool){
     } else {
       statusHtml = '<span class="status pending">Upcoming</span>';
     }
-    const teamAHtml = (r.played && r.winner===teamA) ? '<span style="color:'+courtColor+'">'+teamA+'</span>' : teamA;
-    const teamBHtml = (r.played && r.winner===teamB) ? '<span style="color:'+courtColor+'">'+teamB+'</span>' : teamB;
+    const teamAHtml = r.tied ? '<span style="color:var(--pending)">'+teamA+'</span>' : (r.played && r.winner===teamA) ? '<span style="color:'+courtColor+'">'+teamA+'</span>' : teamA;
+    const teamBHtml = r.tied ? '<span style="color:var(--pending)">'+teamB+'</span>' : (r.played && r.winner===teamB) ? '<span style="color:'+courtColor+'">'+teamB+'</span>' : teamB;
     html += '<div class="match-row"><span class="rd">'+roundTimeText(round)+'</span>'+
       '<span class="teams">'+teamAHtml+'<span class="vs">vs</span>'+teamBHtml+'<div class="work">Work Team: '+workTeam+'</div></span>'+
       '<span style="text-align:right">'+statusHtml+'</span></div>';
