@@ -602,7 +602,7 @@ document.addEventListener('input', (e)=>{
     // restore focus so typing isn't interrupted by the re-render
     const sel = 'input[data-target="pool"][data-pool="'+pool+'"][data-round="'+round+'"][data-set="'+set+'"][data-side="'+side+'"]';
     const el = document.querySelector(sel);
-    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+    if(el){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(err){ /* number inputs don't support text selection in some browsers */ } }
   }
   if(t.matches('input[data-target="bracket"]')){
     const { bkey, slot, set, side } = t.dataset;
@@ -612,7 +612,7 @@ document.addEventListener('input', (e)=>{
     renderStatusAndBracket();
     const sel = 'input[data-target="bracket"][data-bkey="'+bkey+'"][data-slot="'+slot+'"][data-set="'+set+'"][data-side="'+side+'"]';
     const el = document.querySelector(sel);
-    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+    if(el){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(err){ /* number inputs don't support text selection in some browsers */ } }
   }
 });
 
