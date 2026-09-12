@@ -904,27 +904,36 @@ function getBracketSeeds(){
       { seed:2, team:'Pool B \u2014 1st place' },
       { seed:3, team:'Pool C \u2014 1st place' },
       { seed:4, team:'Pool A \u2014 2nd place' },
-      { seed:5, team:'Pool B \u2014 2nd place' },
-      { seed:6, team:'Pool C \u2014 2nd place' }
+      { seed:5, team:'Pool C \u2014 2nd place' },
+      { seed:6, team:'Pool B \u2014 2nd place' }
     ];
     const silver = [
       { seed:1, team:'Pool A \u2014 3rd place' },
       { seed:2, team:'Pool B \u2014 3rd place' },
       { seed:3, team:'Pool C \u2014 3rd place' },
       { seed:4, team:'Pool A \u2014 4th place' },
-      { seed:5, team:'Pool B \u2014 4th place' },
-      { seed:6, team:'Pool C \u2014 4th place' }
+      { seed:5, team:'Pool C \u2014 4th place' },
+      { seed:6, team:'Pool B \u2014 4th place' }
     ];
     return { gold, silver };
   }
 
   const results = POOLS.map(p=> ({ pool:p.key, ...poolStandings(p) }));
-  const rankGroup = (rankNum)=> results.map(r=> r.standings.find(s=>s.rank===rankNum));
+  const findRank = (poolKey, rankNum) => results.find(r=>r.pool===poolKey).standings.find(s=>s.rank===rankNum);
   const sortGroup = (group)=> group.slice().sort((a,b)=> b.wins-a.wins || b.setPct-a.setPct || b.ptPct-a.ptPct);
-  const goldTop = sortGroup(rankGroup(1));    // seeds 1-3
-  const goldMid = sortGroup(rankGroup(2));    // seeds 4-6
-  const silverTop = sortGroup(rankGroup(3));  // seeds 1-3
-  const silverMid = sortGroup(rankGroup(4));  // seeds 4-6
+
+  const goldTop = sortGroup(['A','B','C'].map(p=>findRank(p,1)));   // 3 pool winners -> seeds 1-3
+  // Pool A's and Pool C's 2nd-place teams always face each other in the quarterfinal
+  // (seeds 4 & 5 play each other); Pool B's 2nd-place team is always seed 6, paired
+  // against the weakest pool winner (seed 3) instead — regardless of relative strength.
+  const acGoldPair = sortGroup([findRank('A',2), findRank('C',2)]);
+  const goldMid = [...acGoldPair, findRank('B',2)];
+
+  const silverTop = sortGroup(['A','B','C'].map(p=>findRank(p,3)));
+  // Same rule for the Teal bracket's 4th-place finishers.
+  const acSilverPair = sortGroup([findRank('A',4), findRank('C',4)]);
+  const silverMid = [...acSilverPair, findRank('B',4)];
+
   const gold = [...goldTop, ...goldMid].map((s,i)=> ({ seed:i+1, team:s.team }));
   const silver = [...silverTop, ...silverMid].map((s,i)=> ({ seed:i+1, team:s.team }));
   return { gold, silver };
