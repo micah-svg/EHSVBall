@@ -323,10 +323,19 @@ function poolStandings(pool){
 }
 function getBracketSeeds(){
   const results = POOLS.map(p=> ({ pool:p.key, standings: poolStandings(p) }));
-  const rankGroup = (rankNum)=> results.map(r=> r.standings.find(s=>s.rank===rankNum));
+  const rankGroup = (rankNum)=> results.map(r=> r.standings.find(s=>s.rank===rankNum)); // fixed order: [PoolA, PoolB, PoolC]
   const sortGroup = (group)=> group.slice().sort((a,b)=> b.wins-a.wins);
-  const gold = [...sortGroup(rankGroup(1)), ...sortGroup(rankGroup(2))].map((s,i)=> ({ seed:i+1, team:s.team }));
-  const silver = [...sortGroup(rankGroup(3)), ...sortGroup(rankGroup(4))].map((s,i)=> ({ seed:i+1, team:s.team }));
+  // Whatever seed the normal ranking gives Pool B's and Pool C's team in this group,
+  // swap those two specific seed assignments — Pool A's stays wherever it naturally fell.
+  const swapPoolBC = (rankNGroup)=>{
+    const sorted = sortGroup(rankNGroup);
+    const bTeam = rankNGroup[1].team, cTeam = rankNGroup[2].team;
+    const bPos = sorted.findIndex(s=>s.team===bTeam), cPos = sorted.findIndex(s=>s.team===cTeam);
+    [sorted[bPos], sorted[cPos]] = [sorted[cPos], sorted[bPos]];
+    return sorted;
+  };
+  const gold = [...sortGroup(rankGroup(1)), ...swapPoolBC(rankGroup(2))].map((s,i)=> ({ seed:i+1, team:s.team }));
+  const silver = [...sortGroup(rankGroup(3)), ...swapPoolBC(rankGroup(4))].map((s,i)=> ({ seed:i+1, team:s.team }));
   return { gold, silver };
 }
 function ensureBracketMatchIn(bm, slotKey){
