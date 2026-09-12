@@ -795,6 +795,7 @@ function renderStandings(){
         resultCell = '<span class="result-tag win">'+tag+'</span><div class="score-line">'+scoreLineText(m)+'</div>';
       } else if(m.status==='live'){
         resultCell = '<span class="result-tag live">LIVE</span>';
+        if(scoreLineText(m)) resultCell += '<div class="score-line">'+scoreLineText(m)+'</div>';
       } else {
         resultCell = '<span class="result-tag pending">Upcoming</span>';
       }
@@ -1036,7 +1037,10 @@ function renderBracketGroup(label, colorClass, bracketKey, seeds, bm, courtNote,
   const matchupFoot = (x, y, played, live, m)=>{
     if(isPlaceholder || x===null || y===null) return '';
     if(played) return '<div class="matchup-foot">'+scoreLineText(m)+'</div>';
-    if(m && m.status==='live') return '<div class="matchup-foot live">LIVE</div>';
+    if(m && m.status==='live'){
+      const line = scoreLineText(m);
+      return '<div class="matchup-foot live">LIVE'+(line ? ' &middot; '+line : '')+'</div>';
+    }
     return '';
   };
   // Finds the slot immediately before slotKey in its court's play order, if any —
