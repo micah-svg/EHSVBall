@@ -185,6 +185,19 @@
   }
   .bracket-time-setter .bracket-time-note{ font-size:11.5px; color:var(--sub); width:100%; }
 
+  .pool-time-setter{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--card);
+    border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:14px;
+    grid-column:1 / -1;
+  }
+  .pool-time-setter label{ font-family:'Oswald'; font-size:13px; color:var(--ink); }
+  .pool-time-setter select, .pool-time-setter input[type=time]{
+    font-family:'Inter'; font-size:14px; padding:7px 10px; border-radius:8px;
+    border:1.5px solid var(--line); background:#fff; color:var(--ink);
+  }
+  .pool-time-setter .pool-time-note{ font-size:11.5px; color:var(--sub); width:100%; }
+  .pool-round-time{ font-size:11px; color:var(--gold); font-weight:600; margin-bottom:3px; }
+
   .empty-note{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px; text-align:center; color:var(--sub); font-size:13.5px; line-height:1.5; }
   .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; }
   .dot.purple{ background:#5B2C8F; }
@@ -270,7 +283,8 @@ let state = {
   poolPlayComplete:false,
   matches:{},
   bracketMatches:{ gold:{}, silver:{} },
-  bracketStartTime:''
+  bracketStartTime:'',
+  poolTimeAdjust:{ round:null, time:'' }
 };
 
 function matchKey(pool,round){ return pool+'-r'+round; }
@@ -440,6 +454,18 @@ function minutesToDisplay(mins){
   let h12 = h%12; if(h12===0) h12=12;
   return h12+':'+String(m).padStart(2,'0')+' '+ampm;
 }
+// Round 1 starts at 9:00 AM; every round after that starts 45 minutes later — unless
+// state.poolTimeAdjust names a round to reset the clock at (e.g. running behind), in
+// which case every round from there onward is 45 min after the one before it, starting
+// from that adjusted time. Rounds before the adjusted one keep the original schedule.
+function roundTimeText(round){
+  const adj = state.poolTimeAdjust;
+  if(adj && adj.round && round >= adj.round){
+    const adjStart = timeStrToMinutes(adj.time);
+    if(adjStart !== null) return minutesToDisplay(adjStart + (round - adj.round)*45);
+  }
+  return minutesToDisplay(9*60 + (round-1)*45);
+}
 function bracketSlotTimeText(bracketKey, slotKey){
   const startMins = timeStrToMinutes(state.bracketStartTime);
   if(startMins===null) return '';
@@ -493,6 +519,7 @@ async function loadState(){
       if(parsed.bracketMatches) state.bracketMatches = parsed.bracketMatches;
       if(typeof parsed.poolPlayComplete === 'boolean') state.poolPlayComplete = parsed.poolPlayComplete;
       if(typeof parsed.bracketStartTime === 'string') state.bracketStartTime = parsed.bracketStartTime;
+      if(parsed.poolTimeAdjust && typeof parsed.poolTimeAdjust === 'object') state.poolTimeAdjust = parsed.poolTimeAdjust;
       lastSnapshot = res.value;
     }
   }catch(e){ /* nothing saved yet */ }
@@ -520,7 +547,7 @@ function updateSaveBar(){
 async function saveNow(){
   const btn = document.getElementById('saveBtn');
   if(btn){ btn.textContent = 'Saving…'; btn.disabled = true; }
-  const payload = JSON.stringify({ matches:state.matches, bracketMatches:state.bracketMatches, poolPlayComplete:state.poolPlayComplete, bracketStartTime:state.bracketStartTime });
+  const payload = JSON.stringify({ matches:state.matches, bracketMatches:state.bracketMatches, poolPlayComplete:state.poolPlayComplete, bracketStartTime:state.bracketStartTime, poolTimeAdjust:state.poolTimeAdjust });
   const res = await window.storage.set('tournament-data', payload, true);
   if(res){
     lastSnapshot = payload;
@@ -547,6 +574,7 @@ function startPolling(){
         if(parsed.bracketMatches) state.bracketMatches = parsed.bracketMatches;
         if(typeof parsed.poolPlayComplete === 'boolean') state.poolPlayComplete = parsed.poolPlayComplete;
         if(typeof parsed.bracketStartTime === 'string') state.bracketStartTime = parsed.bracketStartTime;
+        if(parsed.poolTimeAdjust && typeof parsed.poolTimeAdjust === 'object') state.poolTimeAdjust = parsed.poolTimeAdjust;
         renderAll();
       }
     }catch(e){ /* skip this tick */ }
@@ -599,7 +627,15 @@ function matchRowHtml(teamA, teamB, m, dataAttrs, extraNote){
 
 // ---------- RENDER: POOL SECTION ----------
 function renderPoolSection(){
-  let html = '';
+  let html = '<div class="pool-time-setter">'+
+    '<label for="poolAdjustRound">Adjust schedule starting at</label>'+
+    '<select id="poolAdjustRound">'+
+      '<option value="">No adjustment (9:00 AM default)</option>'+
+      [1,2,3,4,5,6].map(r=>'<option value="'+r+'"'+(state.poolTimeAdjust.round===r?' selected':'')+'>Round '+r+'</option>').join('')+
+    '</select>'+
+    '<input type="time" id="poolAdjustTimeInput" value="'+(state.poolTimeAdjust.time||'')+'">'+
+    '<span class="pool-time-note">That round and every round after it start there, 45 min apart. Earlier rounds keep their original time.</span>'+
+    '</div>';
   POOLS.forEach(pool=>{
     html += '<div class="court-card"><div class="court-head"><span class="pool-name">Pool '+pool.key+'</span><span class="court-tag">'+courtLabel(pool.court)+'</span></div>';
     ROUND_PATTERN.forEach((pair, idx)=>{
@@ -607,7 +643,8 @@ function renderPoolSection(){
       const teamA = pool.teams[pair[0]], teamB = pool.teams[pair[1]];
       const m = ensureMatch(pool.key, round);
       const dataAttrs = 'data-target="pool" data-pool="'+pool.key+'" data-round="'+round+'"';
-      html += matchRowHtml(teamA, teamB, m, dataAttrs);
+      const note = '<div class="pool-round-time">'+roundTimeText(round)+'</div>';
+      html += matchRowHtml(teamA, teamB, m, dataAttrs, note);
     });
     html += '</div>';
   });
@@ -737,6 +774,16 @@ document.addEventListener('change', (e)=>{
     state.bracketStartTime = t.value;
     markDirty();
     renderStatusAndBracket();
+  }
+  if(t.id==='poolAdjustRound'){
+    state.poolTimeAdjust.round = t.value ? Number(t.value) : null;
+    markDirty();
+    renderPoolSection();
+  }
+  if(t.id==='poolAdjustTimeInput'){
+    state.poolTimeAdjust.time = t.value;
+    markDirty();
+    renderPoolSection();
   }
 });
 

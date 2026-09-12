@@ -249,7 +249,7 @@ function courtLabel(n, upper){
   return '<span style="color:'+COURT_COLORS[n]+'">'+text+'</span>';
 }
 
-let state = { matches:{} };
+let state = { matches:{}, poolTimeAdjust:{ round:null, time:'' } };
 
 function ensureMatch(pool,round){
   const k = pool+'-r'+round;
@@ -257,13 +257,30 @@ function ensureMatch(pool,round){
   return state.matches[k];
 }
 
-// Round 1 starts at 9:00 AM; every round after that starts 45 minutes later.
-function roundTimeText(round){
-  const totalMins = 9*60 + (round-1)*45;
-  let h = Math.floor(totalMins/60), m = totalMins%60;
+function timeStrToMinutes(hhmm){
+  if(!hhmm) return null;
+  const parts = hhmm.split(':');
+  const h = Number(parts[0]), m = Number(parts[1]);
+  if(isNaN(h) || isNaN(m)) return null;
+  return h*60 + m;
+}
+function minutesToDisplay(mins){
+  const total = ((mins % 1440) + 1440) % 1440;
+  let h = Math.floor(total/60), m = total%60;
   const ampm = h>=12 ? 'PM':'AM';
   let h12 = h%12; if(h12===0) h12=12;
   return h12+':'+String(m).padStart(2,'0')+' '+ampm;
+}
+// Round 1 starts at 9:00 AM; every round after that starts 45 minutes later — unless
+// state.poolTimeAdjust names a round to reset the clock at (running behind schedule),
+// in which case that round and every round after it are 45 min apart starting there.
+function roundTimeText(round){
+  const adj = state.poolTimeAdjust;
+  if(adj && adj.round && round >= adj.round){
+    const adjStart = timeStrToMinutes(adj.time);
+    if(adjStart !== null) return minutesToDisplay(adjStart + (round - adj.round)*45);
+  }
+  return minutesToDisplay(9*60 + (round-1)*45);
 }
 function computeMatchResult(m, teamA, teamB){
   const status = m.status || (m.live ? 'live' : 'upcoming');
@@ -395,6 +412,7 @@ async function pollData(){
       lastSnapshot = res.value;
       const parsed = JSON.parse(res.value);
       if(parsed.matches) state.matches = parsed.matches;
+      if(parsed.poolTimeAdjust && typeof parsed.poolTimeAdjust === 'object') state.poolTimeAdjust = parsed.poolTimeAdjust;
       render();
     }
     setUpdatedNow();

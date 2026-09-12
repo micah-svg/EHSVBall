@@ -617,7 +617,8 @@ let state = {
   poolPlayComplete:false,
   matches:{}, // key `${pool}-r${round}` -> {sets:[{a,b},...], live:false}
   bracketMatches:{ gold:{}, silver:{} }, // gold.qfA/qfB/sf1/sf2/final -> {sets:[{a,b},...], live:false}
-  bracketStartTime:''
+  bracketStartTime:'',
+  poolTimeAdjust:{ round:null, time:'' }
 };
 
 function matchKey(pool,round){ return pool+'-r'+round; }
@@ -650,6 +651,7 @@ async function loadState(){
       if(parsed.bracketMatches) state.bracketMatches = parsed.bracketMatches;
       if(typeof parsed.poolPlayComplete === 'boolean') state.poolPlayComplete = parsed.poolPlayComplete;
       if(typeof parsed.bracketStartTime === 'string') state.bracketStartTime = parsed.bracketStartTime;
+      if(parsed.poolTimeAdjust && typeof parsed.poolTimeAdjust === 'object') state.poolTimeAdjust = parsed.poolTimeAdjust;
       lastDataSnapshot = dataRes.value;
     }
   }catch(e){ /* no shared data yet */ }
@@ -685,6 +687,7 @@ function startLivePolling(){
         if(parsed.bracketMatches) state.bracketMatches = parsed.bracketMatches;
         if(typeof parsed.poolPlayComplete === 'boolean') state.poolPlayComplete = parsed.poolPlayComplete;
         if(typeof parsed.bracketStartTime === 'string') state.bracketStartTime = parsed.bracketStartTime;
+        if(parsed.poolTimeAdjust && typeof parsed.poolTimeAdjust === 'object') state.poolTimeAdjust = parsed.poolTimeAdjust;
         renderStandings();
         renderBracket();
       }
@@ -696,6 +699,11 @@ function startLivePolling(){
 // ---------- MATCH RESULT CALC ----------
 // Round 1 starts at 9:00 AM; every round after that starts 45 minutes later.
 function roundTimeText(round){
+  const adj = state.poolTimeAdjust;
+  if(adj && adj.round && round >= adj.round){
+    const adjStart = timeStrToMinutes(adj.time);
+    if(adjStart !== null) return minutesToDisplay(adjStart + (round - adj.round)*45);
+  }
   const totalMins = 9*60 + (round-1)*45;
   let h = Math.floor(totalMins/60), m = totalMins%60;
   const ampm = h>=12 ? 'PM':'AM';
