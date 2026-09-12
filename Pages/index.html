@@ -210,11 +210,11 @@
   }
   table.pooltable td{ padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
   table.pooltable tr:last-child td{ border-bottom:none; }
-  table.pooltable th:nth-child(1), table.pooltable td:nth-child(1){ width:26%; }
-  table.pooltable th:nth-child(2), table.pooltable td:nth-child(2){ width:20%; }
-  table.pooltable th:nth-child(3), table.pooltable td:nth-child(3){ width:8%; text-align:center; }
+  table.pooltable th:nth-child(1), table.pooltable td:nth-child(1){ width:14%; text-align:center; }
+  table.pooltable th:nth-child(2), table.pooltable td:nth-child(2){ width:24%; }
+  table.pooltable th:nth-child(3), table.pooltable td:nth-child(3){ width:18%; }
   table.pooltable th:nth-child(4), table.pooltable td:nth-child(4){ width:20%; }
-  table.pooltable th:nth-child(5), table.pooltable td:nth-child(5){ width:26%; }
+  table.pooltable th:nth-child(5), table.pooltable td:nth-child(5){ width:24%; }
   table.pooltable .rd-col{ text-align:center; font-family:'Oswald'; color:var(--sub); }
 
   table.rostertable{ width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
@@ -689,6 +689,14 @@ function startLivePolling(){
 
 // ---------- TIME HELPERS ----------
 // ---------- MATCH RESULT CALC ----------
+// Round 1 starts at 9:00 AM; every round after that starts 45 minutes later.
+function roundTimeText(round){
+  const totalMins = 9*60 + (round-1)*45;
+  let h = Math.floor(totalMins/60), m = totalMins%60;
+  const ampm = h>=12 ? 'PM':'AM';
+  let h12 = h%12; if(h12===0) h12=12;
+  return h12+':'+String(m).padStart(2,'0')+' '+ampm;
+}
 // A match only counts as "played" — and only shows a winner — once the scorekeeper has
 // explicitly marked it Completed. Scores can be entered while a match is Upcoming or Live
 // without affecting standings, bracket seeding, or the public "X won" display.
@@ -760,7 +768,7 @@ function renderStandings(){
     const { standings } = poolStandings(pool);
     html += '<div class="court-card"><div class="court-head"><span class="pool-name">Pool '+pool.key+'</span><span class="court-tag">'+courtLabel(pool.court, true)+'</span></div>';
     // matches — same column layout as before (Match, Location, then a round/pool identifier, then Work Team), plus Result since that's the point of this tab
-    html += '<table class="pooltable"><thead><tr><th>Match</th><th>Location</th><th>Rd</th><th>Work Team</th><th>Result</th></tr></thead><tbody>';
+    html += '<table class="pooltable"><thead><tr><th>Est. Time</th><th>Match</th><th>Location</th><th>Work Team</th><th>Result</th></tr></thead><tbody>';
     ROUND_PATTERN.forEach((pair, idx)=>{
       const round = idx+1;
       const teamA = pool.teams[pair[0]], teamB = pool.teams[pair[1]];
@@ -776,7 +784,7 @@ function renderStandings(){
       } else {
         resultCell = '<span class="result-tag pending">Upcoming</span>';
       }
-      html += '<tr><td>'+teamLink(teamA)+' vs '+teamLink(teamB)+'</td><td class="time-col">'+courtLabel(pool.court)+'</td><td class="rd-col">R'+round+'</td><td>'+teamLink(workTeam)+'</td><td>'+resultCell+'</td></tr>';
+      html += '<tr><td class="rd-col">'+roundTimeText(round)+'</td><td>'+teamLink(teamA)+' vs '+teamLink(teamB)+'</td><td class="time-col">'+courtLabel(pool.court)+'</td><td>'+teamLink(workTeam)+'</td><td>'+resultCell+'</td></tr>';
     });
     html += '</tbody></table>';
     // standings table
@@ -788,6 +796,7 @@ function renderStandings(){
         '<td>'+(s.ptPct*100).toFixed(0)+'%</td></tr>';
     });
     html += '</tbody></table>';
+    html += '<div class="tiebreak-note">Round times are estimates &mdash; each match starts as soon as the previous one on that court finishes, not necessarily at the clock time shown.</div>';
     html += '<div class="tiebreak-note">Tiebreakers, in order: pool record &rarr; head-to-head (2-way ties only) &rarr; set % &rarr; point %. Places 1-2 advance to the Purple bracket, 3-4 to the Teal bracket.</div>';
     html += '<div class="tiebreak-note">Once pool play is complete: this pool\u2019s 1st and 2nd place finishers move on to the Purple Bracket (EHS Main Gym &amp; EHS Aux Gym); 3rd and 4th place finishers move on to the Teal Bracket (River Mill Gym). Within each bracket, the best cross-pool record earns a bye into the semifinal and works that gym\u2019s first quarterfinal instead of playing it; the rest play in the quarterfinal, and the losing team then works the next match on that same court. Exact opponents and court assignments depend on how every pool finishes &mdash; check the Bracket Play tab once pool play is marked complete.</div>';
     html += '<div class="tiebreak-note">Work Team provides 2 line judges per set, a libero tracker, and a score flipper for that match.</div>';
