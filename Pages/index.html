@@ -936,19 +936,24 @@ function getBracketSeeds(){
 // a bracket group. The Purple bracket splits across two courts (so its Final loser has
 // no further match on that specific court); the Teal bracket plays entirely on one court,
 // so its whole run of matches chains together.
-const BRACKET_COURT_PLAN = {
-  gold:   { 1:['qfA','sf1','final'], 2:['qfB','sf2'] },
-  silver: { 3:['qfA','qfB','sf1','sf2','final'] }
+// Every physical court's actual match order, mixing both brackets as needed so all three
+// courts stay busy each round instead of River Mill running all 5 Silver matches alone
+// while Aux Gym sits idle. Silver's first semifinal moves to Aux Gym once it frees up
+// after Gold's semifinal there — everything else stays on its original court.
+const COURT_TIMELINE = {
+  1: [['gold','qfA'], ['gold','sf1'], ['gold','final']],
+  2: [['gold','qfB'], ['gold','sf2'], ['silver','sf1']],
+  3: [['silver','qfA'], ['silver','qfB'], ['silver','sf2'], ['silver','final']]
 };
 const SLOT_COURT = {
   gold:   { qfA:1, qfB:2, sf1:1, sf2:2, final:1 },
-  silver: { qfA:3, qfB:3, sf1:3, sf2:3, final:3 }
+  silver: { qfA:3, qfB:3, sf1:2, sf2:3, final:3 }
 };
 // Game ID for OSAA reporting: numbered 1-5 within each bracket, in schedule order
 // (quarterfinals first, then semis, then the final).
 const GAME_ID = { qfA:1, qfB:2, sf1:3, sf2:4, final:5 };
-// Every bracket court's first match starts at state.bracketStartTime; every match after
-// that on the SAME court starts 45 minutes after the previous one on that court.
+// Every court's first match starts at state.bracketStartTime; every match after that on
+// the SAME physical court starts 45 minutes after the previous one on that court.
 function timeStrToMinutes(hhmm){
   if(!hhmm) return null;
   const parts = hhmm.split(':');
@@ -966,37 +971,40 @@ function minutesToDisplay(mins){
 function bracketSlotTimeText(bracketKey, slotKey){
   const startMins = timeStrToMinutes(state.bracketStartTime);
   if(startMins===null) return '';
-  for(const seq of Object.values(BRACKET_COURT_PLAN[bracketKey])){
-    const idx = seq.indexOf(slotKey);
-    if(idx >= 0) return minutesToDisplay(startMins + idx*45);
-  }
-  return '';
+  const court = SLOT_COURT[bracketKey][slotKey];
+  const idx = COURT_TIMELINE[court].findIndex(([bk,sk])=> bk===bracketKey && sk===slotKey);
+  if(idx < 0) return '';
+  return minutesToDisplay(startMins + idx*45);
 }
 
 // A team eliminated from a bracket match works the NEXT match scheduled on that same
-// court. The very first match on each court has no prior loser to draw from, so instead
-// we use whichever team already known to be playing the SECOND match on that court is
-// the lowest-ranked (worst seed) — that keeps them at the same gym instead of making
-// them travel somewhere else just to work a match.
-function computeWorkTeams(st, bracketKey, seeds){
-  const seedOf = team => seeds.find(s=>s.team===team)?.seed ?? 999;
-  const work = {};
-  Object.values(BRACKET_COURT_PLAN[bracketKey]).forEach(seq=>{
-    seq.forEach((slot, i)=>{
+// physical court — regardless of which bracket that next match belongs to, since courts
+// now mix Purple and Teal matches to stay busy. The very first match on a court has no
+// prior loser to draw from, so instead it's worked by whichever team already known to be
+// playing the court's SECOND scheduled match has the worse seed (within its own bracket).
+function computeGlobalWorkTeams(stByBracket, seedsByBracket){
+  const seedOf = (bracket, team) => seedsByBracket[bracket].find(s=>s.team===team)?.seed ?? 999;
+  const work = { gold:{}, silver:{} };
+  Object.values(COURT_TIMELINE).forEach(seq=>{
+    seq.forEach(([bracket, slot], i)=>{
       if(i===0){
-        const next = seq.length>1 ? st[seq[1]] : null;
-        const candidates = next ? [next.x, next.y].filter(t=>t!==null) : [];
+        const next = seq.length>1 ? seq[1] : null;
+        if(!next){ work[bracket][slot] = null; return; }
+        const [nb, ns] = next;
+        const nextSt = stByBracket[nb][ns];
+        const candidates = [nextSt.x, nextSt.y].filter(t=>t!==null);
         if(candidates.length===2){
-          work[slot] = seedOf(candidates[0]) > seedOf(candidates[1]) ? candidates[0] : candidates[1];
+          work[bracket][slot] = seedOf(nb,candidates[0]) > seedOf(nb,candidates[1]) ? candidates[0] : candidates[1];
         } else if(candidates.length===1){
-          work[slot] = candidates[0];
+          work[bracket][slot] = candidates[0];
         } else {
-          work[slot] = null;
+          work[bracket][slot] = null;
         }
         return;
       }
-      const prev = st[seq[i-1]];
-      work[slot] = (prev && prev.played) ? (prev.winner===prev.x ? prev.y : prev.x) : null;
+      const [pb, ps] = seq[i-1];
+      const prev = stByBracket[pb][ps];
+      work[bracket][slot] = (prev && prev.played) ? (prev.winner===prev.x ? prev.y : prev.x) : null;
     });
   });
   return work;
@@ -1027,10 +1035,9 @@ function bracketStructure(seeds, bm){
   };
 }
 
-function renderBracketGroup(label, colorClass, bracketKey, seeds, bm, courtNote, isPlaceholder){
-  const st = bracketStructure(seeds, isPlaceholder ? {} : bm);
-  const work = computeWorkTeams(st, bracketKey, seeds);
-
+function renderBracketGroup(label, colorClass, bracketKey, seeds, stByBracket, workByBracket, courtNote, isPlaceholder){
+  const st = stByBracket[bracketKey];
+  const work = workByBracket[bracketKey];
   const teamRow = (name, seed, isWinner)=>{
     if(name===null) return '<div class="team-row tbd-row">TBD</div>';
     if(isPlaceholder) return '<div class="team-row placeholder-row">'+name+'</div>';
@@ -1051,22 +1058,22 @@ function renderBracketGroup(label, colorClass, bracketKey, seeds, bm, courtNote,
     }
     return '';
   };
-  // Finds the slot immediately before slotKey in its court's play order, if any —
-  // used so a not-yet-known work team can be named as "loser of that specific match".
+  // Finds the slot immediately before slotKey in its physical court's play order, if
+  // any — may belong to the OTHER bracket now that courts mix Purple and Teal matches.
+  // Used so a not-yet-known work team can be named as "loser of that specific match".
   const findPrevSlot = (slotKey)=>{
-    for(const seq of Object.values(BRACKET_COURT_PLAN[bracketKey])){
-      const idx = seq.indexOf(slotKey);
-      if(idx > 0) return seq[idx-1];
-    }
-    return null;
+    const court = SLOT_COURT[bracketKey][slotKey];
+    const seq = COURT_TIMELINE[court];
+    const idx = seq.findIndex(([bk,sk])=> bk===bracketKey && sk===slotKey);
+    return idx > 0 ? seq[idx-1] : null;
   };
   const matchupWork = (slotKey, x, y)=>{
     if(x===null || y===null) return '';
     const w = work[slotKey];
     if(isPlaceholder) return '<div class="matchup-work">Work Team: '+w+'</div>';
     if(w) return '<div class="matchup-work">Work Team: '+teamLink(w)+'</div>';
-    const prevKey = findPrevSlot(slotKey);
-    const prev = prevKey ? st[prevKey] : null;
+    const prevPair = findPrevSlot(slotKey);
+    const prev = prevPair ? stByBracket[prevPair[0]][prevPair[1]] : null;
     if(prev && prev.x && prev.y){
       return '<div class="matchup-work">Work Team: Loser of '+teamLink(prev.x)+' v. '+teamLink(prev.y)+' match</div>';
     }
@@ -1127,6 +1134,12 @@ function renderBracketGroup(label, colorClass, bracketKey, seeds, bm, courtNote,
 function renderBracket(){
   const { gold, silver } = getBracketSeeds();
   const complete = state.poolPlayComplete;
+  const isPlaceholder = !complete;
+  const stByBracket = {
+    gold: bracketStructure(gold, isPlaceholder ? {} : state.bracketMatches.gold),
+    silver: bracketStructure(silver, isPlaceholder ? {} : state.bracketMatches.silver)
+  };
+  const workByBracket = computeGlobalWorkTeams(stByBracket, { gold, silver });
   let html = '<div class="tiebreak-note" style="margin-bottom:16px;background:var(--card);border:1px solid var(--line);border-radius:8px;">';
   if(complete){
     html += 'Seeds 1-3 in each bracket are the pool winners/runner-ups (or 3rd/4th place teams for Silver), ranked by record, set %, then point %. <span class="final-flag">Final seeding</span>';
@@ -1134,11 +1147,11 @@ function renderBracket(){
     html += 'Pool play isn\u2019t finished yet, so team names aren\u2019t locked in. This shows the bracket shape and which pool finish feeds each slot &mdash; not final seed order. The quarterfinal work-team assignments below are based on that same pool finish, so you can see roughly where you might be reffing in the afternoon, but they can still shift if final pool standings change. <span class="provisional-flag">Pool play in progress</span>';
   }
   html += '</div>';
-  html += '<div class="tiebreak-note" style="margin-bottom:16px;">First bracket matches are estimated to begin around <strong>1:15 PM</strong>, once pool play wraps up on all three courts.</div>';
-  html += renderBracketGroup('Purple Bracket', 'purple', 'gold', gold, state.bracketMatches.gold, courtLabel(1)+' &amp; '+courtLabel(2), !complete);
-  html += renderBracketGroup('Teal Bracket', 'teal', 'silver', silver, state.bracketMatches.silver, courtLabel(3), !complete);
+  html += '<div class="tiebreak-note" style="margin-bottom:16px;">First bracket matches are estimated to begin around <strong>1:15 PM</strong>, once pool play wraps up on all three courts. All three courts run bracket matches back to back with no gaps, except for the very last match of the day.</div>';
+  html += renderBracketGroup('Purple Bracket', 'purple', 'gold', gold, stByBracket, workByBracket, courtLabel(1)+' &amp; '+courtLabel(2), isPlaceholder);
+  html += renderBracketGroup('Teal Bracket', 'teal', 'silver', silver, stByBracket, workByBracket, courtLabel(3)+' &amp; '+courtLabel(2), isPlaceholder);
   if(complete){
-    html += '<div class="tiebreak-note" style="margin-top:16px;">A team eliminated from bracket play works the next match on that same court &mdash; 2 line judges per set, a libero tracker, and a score flipper. The first match on each court is worked by the lowest-seeded team already scheduled to play there next, so no one has to travel to another gym just to work. Each game\u2019s ID (shown above the matchup) is used to report bracket results to OSAA for official RPI ranking.</div>';
+    html += '<div class="tiebreak-note" style="margin-top:16px;">A team eliminated from bracket play works the next match on that same court &mdash; 2 line judges per set, a libero tracker, and a score flipper. Courts mix Purple and Teal matches to stay busy, so that next match might belong to the other bracket. The first match on each court is worked by the lowest-seeded team already scheduled to play there next, so no one has to travel to another gym just to work. Each game\u2019s ID (shown above the matchup) is used to report bracket results to OSAA for official RPI ranking.</div>';
   }
   document.getElementById('view-bracket').innerHTML = html;
 }

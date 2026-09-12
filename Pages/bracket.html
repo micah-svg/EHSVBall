@@ -254,13 +254,18 @@ const POOLS = [
 const ROUND_PATTERN = [[0,3],[1,2],[0,2],[1,3],[0,1],[2,3]];
 const COURT_NAMES = { 1:'EHS Main Gym', 2:'EHS Aux Gym', 3:'River Mill Gym' };
 const COURT_COLORS = { 1:'#E8749E', 2:'#1D9A8C', 3:'#8B5FBF' };
-const BRACKET_COURT_PLAN = {
-  gold:   { 1:['qfA','sf1','final'], 2:['qfB','sf2'] },
-  silver: { 3:['qfA','qfB','sf1','sf2','final'] }
+// Every physical court's actual match order, mixing both brackets as needed so all three
+// courts stay busy each round instead of River Mill running all 5 Silver matches alone
+// while Aux Gym sits idle. Silver's first semifinal moves to Aux Gym once it frees up
+// after Gold's semifinal there — everything else stays on its original court.
+const COURT_TIMELINE = {
+  1: [['gold','qfA'], ['gold','sf1'], ['gold','final']],
+  2: [['gold','qfB'], ['gold','sf2'], ['silver','sf1']],
+  3: [['silver','qfA'], ['silver','qfB'], ['silver','sf2'], ['silver','final']]
 };
 const SLOT_COURT = {
   gold:   { qfA:1, qfB:2, sf1:1, sf2:2, final:1 },
-  silver: { qfA:3, qfB:3, sf1:3, sf2:3, final:3 }
+  silver: { qfA:3, qfB:3, sf1:2, sf2:3, final:3 }
 };
 const GAME_ID = { qfA:1, qfB:2, sf1:3, sf2:4, final:5 };
 
@@ -328,28 +333,33 @@ function ensureBracketMatchIn(bm, slotKey){
   return bm[slotKey];
 }
 // A team eliminated from a bracket match works the NEXT match scheduled on that same
-// court. The very first match on each court has no prior loser, so instead we use
-// whichever team already known to be playing the SECOND match on that court is the
-// lowest-ranked (worst seed) — keeps them at the same gym instead of traveling to work.
-function computeWorkTeams(st, bracketKey, seeds){
-  const seedOf = team => seeds.find(s=>s.team===team)?.seed ?? 999;
-  const work = {};
-  Object.values(BRACKET_COURT_PLAN[bracketKey]).forEach(seq=>{
-    seq.forEach((slot, i)=>{
+// physical court — regardless of which bracket that next match belongs to, since courts
+// now mix Purple and Teal matches to stay busy. The very first match on a court has no
+// prior loser to draw from, so instead it's worked by whichever team already known to be
+// playing the court's SECOND scheduled match has the worse seed (within its own bracket).
+function computeGlobalWorkTeams(stByBracket, seedsByBracket){
+  const seedOf = (bracket, team) => seedsByBracket[bracket].find(s=>s.team===team)?.seed ?? 999;
+  const work = { gold:{}, silver:{} };
+  Object.values(COURT_TIMELINE).forEach(seq=>{
+    seq.forEach(([bracket, slot], i)=>{
       if(i===0){
-        const next = seq.length>1 ? st[seq[1]] : null;
-        const candidates = next ? [next.x, next.y].filter(t=>t!==null) : [];
+        const next = seq.length>1 ? seq[1] : null;
+        if(!next){ work[bracket][slot] = null; return; }
+        const [nb, ns] = next;
+        const nextSt = stByBracket[nb][ns];
+        const candidates = [nextSt.x, nextSt.y].filter(t=>t!==null);
         if(candidates.length===2){
-          work[slot] = seedOf(candidates[0]) > seedOf(candidates[1]) ? candidates[0] : candidates[1];
+          work[bracket][slot] = seedOf(nb,candidates[0]) > seedOf(nb,candidates[1]) ? candidates[0] : candidates[1];
         } else if(candidates.length===1){
-          work[slot] = candidates[0];
+          work[bracket][slot] = candidates[0];
         } else {
-          work[slot] = null;
+          work[bracket][slot] = null;
         }
         return;
       }
-      const prev = st[seq[i-1]];
-      work[slot] = (prev && prev.played) ? (prev.winner===prev.x ? prev.y : prev.x) : null;
+      const [pb, ps] = seq[i-1];
+      const prev = stByBracket[pb][ps];
+      work[bracket][slot] = (prev && prev.played) ? (prev.winner===prev.x ? prev.y : prev.x) : null;
     });
   });
   return work;
@@ -402,16 +412,24 @@ function minutesToDisplay(mins){
 function bracketSlotTimeText(bracketKey, slotKey){
   const startMins = timeStrToMinutes(state.bracketStartTime);
   if(startMins===null) return '';
-  for(const seq of Object.values(BRACKET_COURT_PLAN[bracketKey])){
-    const idx = seq.indexOf(slotKey);
-    if(idx >= 0) return minutesToDisplay(startMins + idx*45);
-  }
-  return '';
+  const court = SLOT_COURT[bracketKey][slotKey];
+  const idx = COURT_TIMELINE[court].findIndex(([bk,sk])=> bk===bracketKey && sk===slotKey);
+  if(idx < 0) return '';
+  return minutesToDisplay(startMins + idx*45);
 }
-function matchupFootHtml(x, y, played, live, setsA, setsB, startTime){
+function scoreLineText(m){
+  return (m.sets||[])
+    .filter(s=> s.a!=null && s.b!=null && !isNaN(s.a) && !isNaN(s.b) && (s.a>0||s.b>0))
+    .map(s=> s.a+'-'+s.b)
+    .join(', ');
+}
+function matchupFootHtml(x, y, played, live, setsA, setsB, startTime, m){
   if(x===null || y===null) return '';
   if(played) return '<div class="matchup-foot">'+Math.max(setsA,setsB)+'-'+Math.min(setsA,setsB)+'</div>';
-  if(live) return '<div class="matchup-foot live">LIVE</div>';
+  if(live){
+    const line = m ? scoreLineText(m) : '';
+    return '<div class="matchup-foot live">LIVE'+(line ? ' &middot; '+line : '')+'</div>';
+  }
   if(startTime) return '<div class="matchup-foot">'+startTime+'</div>';
   return '<div class="matchup-foot">Upcoming</div>';
 }
@@ -427,11 +445,8 @@ function workLineHtml(slotKey, x, y, work){
   return '<div class="matchup-work">'+(w ? 'Work Team: '+w : 'Work Team: TBD') +'</div>';
 }
 
-function renderBracketPanel(label, colorClass, bKey, seeds){
-  const bm = state.bracketMatches[bKey] || {};
-  const st = bracketStructure(seeds, bm);
-  const work = computeWorkTeams(st, bKey, seeds);
-  const courtNote = bKey==='gold' ? COURT_NAMES[1]+' &amp; '+COURT_NAMES[2] : COURT_NAMES[3];
+function renderBracketPanel(label, colorClass, bKey, seeds, st, work){
+  const courtNote = bKey==='gold' ? COURT_NAMES[1]+' &amp; '+COURT_NAMES[2] : COURT_NAMES[3]+' &amp; '+COURT_NAMES[2];
 
   let html = '<div class="bracket-panel '+colorClass+'-accent">';
   html += '<div class="bracket-head '+colorClass+'"><h2>'+label+'</h2><span class="court-note">'+courtNote+'</span></div>';
@@ -440,21 +455,21 @@ function renderBracketPanel(label, colorClass, bKey, seeds){
   html += '<div class="round round1">';
   html += '<div class="pair">';
   html += '<div class="matchup">'+teamRowHtml(seeds.find(s=>s.seed===1)?.team||null, true, false)+teamRowHtml(null,false,true)+'</div>';
-  html += '<div class="matchup">'+gameTag(bKey,'qfA')+teamRowHtml(st.qfA.x, st.qfA.winner===st.qfA.x, false)+teamRowHtml(st.qfA.y, st.qfA.winner===st.qfA.y, false)+matchupFootHtml(st.qfA.x, st.qfA.y, st.qfA.played, st.qfA.m.status==='live', st.qfA.setsA, st.qfA.setsB, st.qfA.m.startTime)+workLineHtml('qfA', st.qfA.x, st.qfA.y, work)+'</div>';
+  html += '<div class="matchup">'+gameTag(bKey,'qfA')+teamRowHtml(st.qfA.x, st.qfA.winner===st.qfA.x, false)+teamRowHtml(st.qfA.y, st.qfA.winner===st.qfA.y, false)+matchupFootHtml(st.qfA.x, st.qfA.y, st.qfA.played, st.qfA.m.status==='live', st.qfA.setsA, st.qfA.setsB, st.qfA.m.startTime, st.qfA.m)+workLineHtml('qfA', st.qfA.x, st.qfA.y, work)+'</div>';
   html += '</div>';
   html += '<div class="pair">';
-  html += '<div class="matchup">'+gameTag(bKey,'qfB')+teamRowHtml(st.qfB.x, st.qfB.winner===st.qfB.x, false)+teamRowHtml(st.qfB.y, st.qfB.winner===st.qfB.y, false)+matchupFootHtml(st.qfB.x, st.qfB.y, st.qfB.played, st.qfB.m.status==='live', st.qfB.setsA, st.qfB.setsB, st.qfB.m.startTime)+workLineHtml('qfB', st.qfB.x, st.qfB.y, work)+'</div>';
+  html += '<div class="matchup">'+gameTag(bKey,'qfB')+teamRowHtml(st.qfB.x, st.qfB.winner===st.qfB.x, false)+teamRowHtml(st.qfB.y, st.qfB.winner===st.qfB.y, false)+matchupFootHtml(st.qfB.x, st.qfB.y, st.qfB.played, st.qfB.m.status==='live', st.qfB.setsA, st.qfB.setsB, st.qfB.m.startTime, st.qfB.m)+workLineHtml('qfB', st.qfB.x, st.qfB.y, work)+'</div>';
   html += '<div class="matchup">'+teamRowHtml(seeds.find(s=>s.seed===2)?.team||null, true, false)+teamRowHtml(null,false,true)+'</div>';
   html += '</div>';
   html += '</div>';
 
   html += '<div class="round round2"><div class="pair">';
-  html += '<div class="matchup">'+gameTag(bKey,'sf1')+teamRowHtml(st.sf1.x, st.sf1.winner===st.sf1.x, false)+teamRowHtml(st.sf1.y, st.sf1.winner===st.sf1.y, false)+matchupFootHtml(st.sf1.x, st.sf1.y, st.sf1.played, st.sf1.m.status==='live', st.sf1.setsA, st.sf1.setsB, st.sf1.m.startTime)+workLineHtml('sf1', st.sf1.x, st.sf1.y, work)+'</div>';
-  html += '<div class="matchup">'+gameTag(bKey,'sf2')+teamRowHtml(st.sf2.x, st.sf2.winner===st.sf2.x, false)+teamRowHtml(st.sf2.y, st.sf2.winner===st.sf2.y, false)+matchupFootHtml(st.sf2.x, st.sf2.y, st.sf2.played, st.sf2.m.status==='live', st.sf2.setsA, st.sf2.setsB, st.sf2.m.startTime)+workLineHtml('sf2', st.sf2.x, st.sf2.y, work)+'</div>';
+  html += '<div class="matchup">'+gameTag(bKey,'sf1')+teamRowHtml(st.sf1.x, st.sf1.winner===st.sf1.x, false)+teamRowHtml(st.sf1.y, st.sf1.winner===st.sf1.y, false)+matchupFootHtml(st.sf1.x, st.sf1.y, st.sf1.played, st.sf1.m.status==='live', st.sf1.setsA, st.sf1.setsB, st.sf1.m.startTime, st.sf1.m)+workLineHtml('sf1', st.sf1.x, st.sf1.y, work)+'</div>';
+  html += '<div class="matchup">'+gameTag(bKey,'sf2')+teamRowHtml(st.sf2.x, st.sf2.winner===st.sf2.x, false)+teamRowHtml(st.sf2.y, st.sf2.winner===st.sf2.y, false)+matchupFootHtml(st.sf2.x, st.sf2.y, st.sf2.played, st.sf2.m.status==='live', st.sf2.setsA, st.sf2.setsB, st.sf2.m.startTime, st.sf2.m)+workLineHtml('sf2', st.sf2.x, st.sf2.y, work)+'</div>';
   html += '</div></div>';
 
   html += '<div class="round round3">';
-  html += '<div class="matchup">'+gameTag(bKey,'final')+teamRowHtml(st.final.x, st.final.winner===st.final.x, false)+teamRowHtml(st.final.y, st.final.winner===st.final.y, false)+matchupFootHtml(st.final.x, st.final.y, st.final.played, st.final.m.status==='live', st.final.setsA, st.final.setsB, st.final.m.startTime)+workLineHtml('final', st.final.x, st.final.y, work)+'</div>';
+  html += '<div class="matchup">'+gameTag(bKey,'final')+teamRowHtml(st.final.x, st.final.winner===st.final.x, false)+teamRowHtml(st.final.y, st.final.winner===st.final.y, false)+matchupFootHtml(st.final.x, st.final.y, st.final.played, st.final.m.status==='live', st.final.setsA, st.final.setsB, st.final.m.startTime, st.final.m)+workLineHtml('final', st.final.x, st.final.y, work)+'</div>';
   html += '</div>';
 
   html += '<div class="round round4">';
@@ -476,9 +491,14 @@ function render(){
     return;
   }
   const { gold, silver } = getBracketSeeds();
+  const stByBracket = {
+    gold: bracketStructure(gold, state.bracketMatches.gold || {}),
+    silver: bracketStructure(silver, state.bracketMatches.silver || {})
+  };
+  const workByBracket = computeGlobalWorkTeams(stByBracket, { gold, silver });
   grid.innerHTML =
-    renderBracketPanel('Purple Bracket', 'purple', 'gold', gold) +
-    renderBracketPanel('Teal Bracket', 'teal', 'silver', silver);
+    renderBracketPanel('Purple Bracket', 'purple', 'gold', gold, stByBracket.gold, workByBracket.gold) +
+    renderBracketPanel('Teal Bracket', 'teal', 'silver', silver, stByBracket.silver, workByBracket.silver);
 }
 
 function setUpdatedNow(){
