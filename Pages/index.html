@@ -351,6 +351,7 @@
     border-top:1px solid var(--line); background:var(--card); font-style:italic;
   }
   .matchup-tag{ font-size:10px; color:var(--sub); text-align:center; padding:5px 6px; background:var(--bg); border-bottom:1px solid var(--line); font-weight:700; letter-spacing:0.3px; }
+  .matchup-time{ color:var(--gold); font-size:11.5px; font-weight:700; letter-spacing:0.2px; }
 
   .champion-box{ background:var(--navy); color:#fff; border-radius:10px; padding:14px 10px; text-align:center; }
   .champion-box .label{ font-size:10px; text-transform:uppercase; letter-spacing:0.5px; opacity:0.85; color:var(--gold); }
@@ -615,7 +616,8 @@ let state = {
   settings:{ matchMinutes:45, warmupMinutes:5 },
   poolPlayComplete:false,
   matches:{}, // key `${pool}-r${round}` -> {sets:[{a,b},...], live:false}
-  bracketMatches:{ gold:{}, silver:{} } // gold.qfA/qfB/sf1/sf2/final -> {sets:[{a,b},...], live:false}
+  bracketMatches:{ gold:{}, silver:{} }, // gold.qfA/qfB/sf1/sf2/final -> {sets:[{a,b},...], live:false}
+  bracketStartTime:''
 };
 
 function matchKey(pool,round){ return pool+'-r'+round; }
@@ -647,6 +649,7 @@ async function loadState(){
       if(parsed.matches) state.matches = parsed.matches;
       if(parsed.bracketMatches) state.bracketMatches = parsed.bracketMatches;
       if(typeof parsed.poolPlayComplete === 'boolean') state.poolPlayComplete = parsed.poolPlayComplete;
+      if(typeof parsed.bracketStartTime === 'string') state.bracketStartTime = parsed.bracketStartTime;
       lastDataSnapshot = dataRes.value;
     }
   }catch(e){ /* no shared data yet */ }
@@ -681,6 +684,7 @@ function startLivePolling(){
         if(parsed.matches) state.matches = parsed.matches;
         if(parsed.bracketMatches) state.bracketMatches = parsed.bracketMatches;
         if(typeof parsed.poolPlayComplete === 'boolean') state.poolPlayComplete = parsed.poolPlayComplete;
+        if(typeof parsed.bracketStartTime === 'string') state.bracketStartTime = parsed.bracketStartTime;
         renderStandings();
         renderBracket();
       }
@@ -926,6 +930,31 @@ const SLOT_COURT = {
 // Game ID for OSAA reporting: numbered 1-5 within each bracket, in schedule order
 // (quarterfinals first, then semis, then the final).
 const GAME_ID = { qfA:1, qfB:2, sf1:3, sf2:4, final:5 };
+// Every bracket court's first match starts at state.bracketStartTime; every match after
+// that on the SAME court starts 45 minutes after the previous one on that court.
+function timeStrToMinutes(hhmm){
+  if(!hhmm) return null;
+  const parts = hhmm.split(':');
+  const h = Number(parts[0]), m = Number(parts[1]);
+  if(isNaN(h) || isNaN(m)) return null;
+  return h*60 + m;
+}
+function minutesToDisplay(mins){
+  const total = ((mins % 1440) + 1440) % 1440;
+  let h = Math.floor(total/60), m = total%60;
+  const ampm = h>=12 ? 'PM':'AM';
+  let h12 = h%12; if(h12===0) h12=12;
+  return h12+':'+String(m).padStart(2,'0')+' '+ampm;
+}
+function bracketSlotTimeText(bracketKey, slotKey){
+  const startMins = timeStrToMinutes(state.bracketStartTime);
+  if(startMins===null) return '';
+  for(const seq of Object.values(BRACKET_COURT_PLAN[bracketKey])){
+    const idx = seq.indexOf(slotKey);
+    if(idx >= 0) return minutesToDisplay(startMins + idx*45);
+  }
+  return '';
+}
 
 // A team eliminated from a bracket match works the NEXT match scheduled on that same
 // court. The very first match on each court has no prior loser to draw from, so instead
@@ -1000,7 +1029,6 @@ function renderBracketGroup(label, colorClass, bracketKey, seeds, bm, courtNote,
     if(isPlaceholder || x===null || y===null) return '';
     if(played) return '<div class="matchup-foot">'+scoreLineText(m)+'</div>';
     if(m && m.status==='live') return '<div class="matchup-foot live">LIVE</div>';
-    if(m && m.startTime) return '<div class="matchup-foot">'+m.startTime+'</div>';
     return '';
   };
   // Finds the slot immediately before slotKey in its court's play order, if any —
@@ -1024,7 +1052,11 @@ function renderBracketGroup(label, colorClass, bracketKey, seeds, bm, courtNote,
     }
     return '<div class="matchup-work">Work Team: TBD until the previous match on this court finishes</div>';
   };
-  const matchupTag = (slotKey)=> '<div class="matchup-tag">Game '+GAME_ID[slotKey]+' &middot; '+courtLabel(SLOT_COURT[bracketKey][slotKey])+'</div>';
+  const matchupTag = (slotKey)=>{
+    const timeText = isPlaceholder ? '' : bracketSlotTimeText(bracketKey, slotKey);
+    return '<div class="matchup-tag">Game '+GAME_ID[slotKey]+' &middot; '+courtLabel(SLOT_COURT[bracketKey][slotKey])+
+      (timeText ? ' <span class="matchup-time">'+timeText+'</span>' : '')+'</div>';
+  };
   const matchup = (slotKey, xRow, yRow, x, y, played, live, m)=>
     '<div class="matchup">'+matchupTag(slotKey)+xRow+yRow+matchupFoot(x,y,played,live,m)+matchupWork(slotKey,x,y)+'</div>';
 

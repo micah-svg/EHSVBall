@@ -166,12 +166,6 @@
   .status-select.status-upcoming{ border-color:var(--pending); color:var(--pending); }
   .status-select.status-live{ border-color:#C0392B; color:#C0392B; }
   .status-select.status-completed{ border-color:var(--win); color:var(--win); }
-  .start-time-input{
-    font-family:'Inter'; font-size:13px; padding:8px 10px; border-radius:8px;
-    border:1.5px solid var(--line); background:#fff; color:var(--ink); margin-left:8px;
-    width:150px;
-  }
-  .start-time-input::placeholder{ color:var(--pending); }
   .bye-row{ padding:12px 14px; color:var(--sub); font-style:italic; font-size:13px; }
   .court-context{
     display:flex; justify-content:space-between; align-items:center; padding:6px 14px;
@@ -179,6 +173,17 @@
     text-transform:uppercase; letter-spacing:0.3px;
   }
   .court-context .work-note{ color:var(--sub); font-weight:600; text-transform:none; letter-spacing:normal; font-size:11px; }
+  .court-context .game-time{ color:var(--gold); font-size:12px; margin-left:6px; letter-spacing:0.3px; }
+  .bracket-time-setter{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--card);
+    border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:16px;
+  }
+  .bracket-time-setter label{ font-family:'Oswald'; font-size:13px; color:var(--ink); }
+  .bracket-time-setter input[type=time]{
+    font-family:'Inter'; font-size:14px; padding:7px 10px; border-radius:8px;
+    border:1.5px solid var(--line); background:#fff; color:var(--ink);
+  }
+  .bracket-time-setter .bracket-time-note{ font-size:11.5px; color:var(--sub); width:100%; }
 
   .empty-note{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px; text-align:center; color:var(--sub); font-size:13.5px; line-height:1.5; }
   .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; }
@@ -264,7 +269,8 @@ function courtLabel(n){
 let state = {
   poolPlayComplete:false,
   matches:{},
-  bracketMatches:{ gold:{}, silver:{} }
+  bracketMatches:{ gold:{}, silver:{} },
+  bracketStartTime:''
 };
 
 function matchKey(pool,round){ return pool+'-r'+round; }
@@ -284,8 +290,7 @@ function normalizeMatch(m){
   if(status!=='upcoming' && status!=='live' && status!=='completed'){
     status = src.live ? 'live' : 'upcoming';
   }
-  const startTime = typeof src.startTime === 'string' ? src.startTime : '';
-  return { sets, status, startTime };
+  return { sets, status };
 }
 function ensureMatch(pool,round){
   const k = matchKey(pool,round);
@@ -410,6 +415,31 @@ const SLOT_COURT = {
 };
 // Game ID for OSAA reporting: numbered 1-5 within each bracket, in schedule order.
 const GAME_ID = { qfA:1, qfB:2, sf1:3, sf2:4, final:5 };
+// Every bracket court's first match starts at state.bracketStartTime; every match after
+// that on the SAME court starts 45 minutes after the previous one on that court.
+function timeStrToMinutes(hhmm){
+  if(!hhmm) return null;
+  const parts = hhmm.split(':');
+  const h = Number(parts[0]), m = Number(parts[1]);
+  if(isNaN(h) || isNaN(m)) return null;
+  return h*60 + m;
+}
+function minutesToDisplay(mins){
+  const total = ((mins % 1440) + 1440) % 1440;
+  let h = Math.floor(total/60), m = total%60;
+  const ampm = h>=12 ? 'PM':'AM';
+  let h12 = h%12; if(h12===0) h12=12;
+  return h12+':'+String(m).padStart(2,'0')+' '+ampm;
+}
+function bracketSlotTimeText(bracketKey, slotKey){
+  const startMins = timeStrToMinutes(state.bracketStartTime);
+  if(startMins===null) return '';
+  for(const seq of Object.values(BRACKET_COURT_PLAN[bracketKey])){
+    const idx = seq.indexOf(slotKey);
+    if(idx >= 0) return minutesToDisplay(startMins + idx*45);
+  }
+  return '';
+}
 // A team eliminated from a bracket match works the NEXT match scheduled on that same
 // court. The very first match on each court has no prior loser, so instead we use
 // whichever team already known to be playing the SECOND match on that court is the
@@ -453,6 +483,7 @@ async function loadState(){
       if(parsed.matches) state.matches = parsed.matches;
       if(parsed.bracketMatches) state.bracketMatches = parsed.bracketMatches;
       if(typeof parsed.poolPlayComplete === 'boolean') state.poolPlayComplete = parsed.poolPlayComplete;
+      if(typeof parsed.bracketStartTime === 'string') state.bracketStartTime = parsed.bracketStartTime;
       lastSnapshot = res.value;
     }
   }catch(e){ /* nothing saved yet */ }
@@ -480,7 +511,7 @@ function updateSaveBar(){
 async function saveNow(){
   const btn = document.getElementById('saveBtn');
   if(btn){ btn.textContent = 'Saving…'; btn.disabled = true; }
-  const payload = JSON.stringify({ matches:state.matches, bracketMatches:state.bracketMatches, poolPlayComplete:state.poolPlayComplete });
+  const payload = JSON.stringify({ matches:state.matches, bracketMatches:state.bracketMatches, poolPlayComplete:state.poolPlayComplete, bracketStartTime:state.bracketStartTime });
   const res = await window.storage.set('tournament-data', payload, true);
   if(res){
     lastSnapshot = payload;
@@ -506,6 +537,7 @@ function startPolling(){
         if(parsed.matches) state.matches = parsed.matches;
         if(parsed.bracketMatches) state.bracketMatches = parsed.bracketMatches;
         if(typeof parsed.poolPlayComplete === 'boolean') state.poolPlayComplete = parsed.poolPlayComplete;
+        if(typeof parsed.bracketStartTime === 'string') state.bracketStartTime = parsed.bracketStartTime;
         renderAll();
       }
     }catch(e){ /* skip this tick */ }
@@ -520,7 +552,6 @@ function matchRowHtml(teamA, teamB, m, dataAttrs, extraNote){
   if(teamA===null || teamB===null) return '';
   const r = computeMatchResult(m, teamA, teamB);
   const status = m.status || 'upcoming';
-  const isBracket = dataAttrs.indexOf('data-target="bracket"') !== -1;
   let html = '<div class="match-row">';
   if(extraNote) html += extraNote;
   html += '<div class="match-teams"><span>'+teamA+'</span><span class="vs">vs</span><span>'+teamB+'</span>';
@@ -531,8 +562,6 @@ function matchRowHtml(teamA, teamB, m, dataAttrs, extraNote){
     html += '<span class="result-tag pending">Completed</span>';
   } else if(status==='live'){
     html += '<span class="result-tag live">LIVE</span>';
-  } else if(isBracket && m.startTime){
-    html += '<span class="result-tag pending">'+m.startTime+'</span>';
   } else {
     html += '<span class="result-tag pending">Upcoming</span>';
   }
@@ -542,12 +571,7 @@ function matchRowHtml(teamA, teamB, m, dataAttrs, extraNote){
     '<option value="upcoming"'+(status==='upcoming'?' selected':'')+'>Upcoming</option>'+
     '<option value="live"'+(status==='live'?' selected':'')+'>Live</option>'+
     '<option value="completed"'+(status==='completed'?' selected':'')+'>Completed</option>'+
-    '</select>';
-  if(isBracket){
-    const timeAttrs = dataAttrs.replace('data-target', 'data-time-target');
-    html += '<input type="text" class="start-time-input" placeholder="Start time, e.g. 1:15 PM" '+timeAttrs+' value="'+(m.startTime||'')+'">';
-  }
-  html += '</div>';
+    '</select></div>';
   html += '<div class="set-inputs">';
   for(let si=0; si<3; si++){
     const s = (m.sets && m.sets[si]) ? m.sets[si] : {a:null,b:null};
@@ -606,6 +630,11 @@ function renderStatusAndBracket(){
   let html = '';
   html += '<div class="empty-note" style="margin-bottom:14px;">A team eliminated from bracket play works the next match on that same court (2 line judges per set, a libero tracker, a score flipper). The first match on each court is worked by the lowest-seeded team already scheduled to play there next, so no one has to travel to another gym just to work.</div>';
   html += '<div class="empty-note" style="margin-bottom:14px; border-color:var(--gold);">All bracket play results and scores need to be submitted to OSAA for official RPI ranking. Use each match\'s Game ID (shown above the matchup) when reporting.</div>';
+  html += '<div class="bracket-time-setter">'+
+    '<label for="bracketStartTimeInput">First bracket matches start at</label>'+
+    '<input type="time" id="bracketStartTimeInput" value="'+(state.bracketStartTime||'')+'">'+
+    '<span class="bracket-time-note">Every later match on the same court is set 45 min after the one before it.</span>'+
+    '</div>';
   html += bracketGroupHtml('Purple Bracket', 'purple', 'gold', gold, state.bracketMatches.gold);
   html += bracketGroupHtml('Teal Bracket', 'teal', 'silver', silver, state.bracketMatches.silver);
   bracketEl.innerHTML = html;
@@ -626,7 +655,9 @@ function bracketGroupHtml(label, dotClass, bKey, seeds, bm){
     if(x===null || y===null) return '<div class="bye-row">Waiting on previous round&hellip;</div>';
     const dataAttrs = 'data-target="bracket" data-bkey="'+bKey+'" data-slot="'+slotKey+'"';
     const w = work[slotKey];
-    const note = '<div class="court-context"><span>Game '+GAME_ID[slotKey]+' &middot; '+courtLabel(SLOT_COURT[bKey][slotKey])+'</span><span class="work-note">'+
+    const timeText = bracketSlotTimeText(bKey, slotKey);
+    const note = '<div class="court-context"><span>Game '+GAME_ID[slotKey]+' &middot; '+courtLabel(SLOT_COURT[bKey][slotKey])+
+      (timeText ? ' <span class="game-time">'+timeText+'</span>' : '')+'</span><span class="work-note">'+
       (w ? 'Work Team: '+w : 'Work Team: TBD')+'</span></div>';
     return matchRowHtml(x, y, m, dataAttrs, note);
   };
@@ -671,16 +702,6 @@ document.addEventListener('input', (e)=>{
     const el = document.querySelector(sel);
     if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
   }
-  if(t.matches('input[data-time-target="bracket"]')){
-    const { bkey, slot } = t.dataset;
-    const m = ensureBracketMatch(bkey, slot);
-    m.startTime = t.value;
-    markDirty();
-    renderStatusAndBracket();
-    const sel = 'input[data-time-target="bracket"][data-bkey="'+bkey+'"][data-slot="'+slot+'"]';
-    const el = document.querySelector(sel);
-    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
-  }
 });
 
 document.addEventListener('change', (e)=>{
@@ -697,6 +718,11 @@ document.addEventListener('change', (e)=>{
     const { bkey, slot } = t.dataset;
     const m = ensureBracketMatch(bkey, slot);
     m.status = t.value;
+    markDirty();
+    renderStatusAndBracket();
+  }
+  if(t.id==='bracketStartTimeInput'){
+    state.bracketStartTime = t.value;
     markDirty();
     renderStatusAndBracket();
   }

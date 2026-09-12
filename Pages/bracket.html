@@ -193,6 +193,7 @@
   .matchup-tag{
     font-size:0.7vw; color:var(--sub); text-align:center; margin-bottom:3px;
   }
+  .matchup-time{ color:#E8749E; font-weight:700; font-size:0.75vw; }
 
   .champion-box{
     background:var(--navy); color:#fff; border-radius:10px; padding:14px 10px; text-align:center;
@@ -263,7 +264,7 @@ const SLOT_COURT = {
 };
 const GAME_ID = { qfA:1, qfB:2, sf1:3, sf2:4, final:5 };
 
-let state = { poolPlayComplete:false, matches:{}, bracketMatches:{ gold:{}, silver:{} } };
+let state = { poolPlayComplete:false, matches:{}, bracketMatches:{ gold:{}, silver:{} }, bracketStartTime:'' };
 
 function ensureMatch(pool,round){
   const k = pool+'-r'+round;
@@ -378,6 +379,31 @@ function teamRowHtml(name, isWinner, isBye){
   if(isBye) return '<div class="team-row bye-row">BYE</div>';
   return '<div class="team-row'+(isWinner?' winner':'')+'">'+name+'</div>';
 }
+// Every bracket court's first match starts at state.bracketStartTime; every match after
+// that on the SAME court starts 45 minutes after the previous one on that court.
+function timeStrToMinutes(hhmm){
+  if(!hhmm) return null;
+  const parts = hhmm.split(':');
+  const h = Number(parts[0]), m = Number(parts[1]);
+  if(isNaN(h) || isNaN(m)) return null;
+  return h*60 + m;
+}
+function minutesToDisplay(mins){
+  const total = ((mins % 1440) + 1440) % 1440;
+  let h = Math.floor(total/60), m = total%60;
+  const ampm = h>=12 ? 'PM':'AM';
+  let h12 = h%12; if(h12===0) h12=12;
+  return h12+':'+String(m).padStart(2,'0')+' '+ampm;
+}
+function bracketSlotTimeText(bracketKey, slotKey){
+  const startMins = timeStrToMinutes(state.bracketStartTime);
+  if(startMins===null) return '';
+  for(const seq of Object.values(BRACKET_COURT_PLAN[bracketKey])){
+    const idx = seq.indexOf(slotKey);
+    if(idx >= 0) return minutesToDisplay(startMins + idx*45);
+  }
+  return '';
+}
 function matchupFootHtml(x, y, played, live, setsA, setsB, startTime){
   if(x===null || y===null) return '';
   if(played) return '<div class="matchup-foot">'+Math.max(setsA,setsB)+'-'+Math.min(setsA,setsB)+'</div>';
@@ -387,7 +413,9 @@ function matchupFootHtml(x, y, played, live, setsA, setsB, startTime){
 }
 function gameTag(bKey, slotKey){
   const court = SLOT_COURT[bKey][slotKey];
-  return '<div class="matchup-tag">Game '+GAME_ID[slotKey]+' &middot; <span style="color:'+COURT_COLORS[court]+'">'+COURT_NAMES[court]+'</span></div>';
+  const timeText = bracketSlotTimeText(bKey, slotKey);
+  return '<div class="matchup-tag">Game '+GAME_ID[slotKey]+' &middot; <span style="color:'+COURT_COLORS[court]+'">'+COURT_NAMES[court]+'</span>'+
+    (timeText ? ' <span class="matchup-time">'+timeText+'</span>' : '')+'</div>';
 }
 function workLineHtml(slotKey, x, y, work){
   if(x===null || y===null) return '';
@@ -465,6 +493,7 @@ async function pollData(){
       if(parsed.matches) state.matches = parsed.matches;
       if(parsed.bracketMatches) state.bracketMatches = parsed.bracketMatches;
       if(typeof parsed.poolPlayComplete === 'boolean') state.poolPlayComplete = parsed.poolPlayComplete;
+      if(typeof parsed.bracketStartTime === 'string') state.bracketStartTime = parsed.bracketStartTime;
       render();
     }
     setUpdatedNow();
