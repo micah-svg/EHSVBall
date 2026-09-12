@@ -269,7 +269,7 @@ const SLOT_COURT = {
 };
 const GAME_ID = { qfA:1, qfB:2, sf1:3, sf2:4, final:5 };
 
-let state = { poolPlayComplete:false, matches:{}, bracketMatches:{ gold:{}, silver:{} }, bracketStartTime:'' };
+let state = { poolPlayComplete:true, matches:{}, bracketMatches:{ gold:{}, silver:{} }, bracketStartTime:'16:00' };
 
 function ensureMatch(pool,round){
   const k = pool+'-r'+round;
@@ -322,20 +322,22 @@ function poolStandings(pool){
   return arr;
 }
 function getBracketSeeds(){
-  const results = POOLS.map(p=> ({ pool:p.key, standings: poolStandings(p) }));
-  const rankGroup = (rankNum)=> results.map(r=> r.standings.find(s=>s.rank===rankNum)); // fixed order: [PoolA, PoolB, PoolC]
-  const sortGroup = (group)=> group.slice().sort((a,b)=> b.wins-a.wins);
-  // Whatever seed the normal ranking gives Pool B's and Pool C's team in this group,
-  // swap those two specific seed assignments — Pool A's stays wherever it naturally fell.
-  const swapPoolBC = (rankNGroup)=>{
-    const sorted = sortGroup(rankNGroup);
-    const bTeam = rankNGroup[1].team, cTeam = rankNGroup[2].team;
-    const bPos = sorted.findIndex(s=>s.team===bTeam), cPos = sorted.findIndex(s=>s.team===cTeam);
-    [sorted[bPos], sorted[cPos]] = [sorted[cPos], sorted[bPos]];
-    return sorted;
-  };
-  const gold = [...sortGroup(rankGroup(1)), ...swapPoolBC(rankGroup(2))].map((s,i)=> ({ seed:i+1, team:s.team }));
-  const silver = [...sortGroup(rankGroup(3)), ...swapPoolBC(rankGroup(4))].map((s,i)=> ({ seed:i+1, team:s.team }));
+  const gold = [
+    { seed:1, team:'Estacada' },      // Pool A 1st place -- bye
+    { seed:2, team:'Astoria' },       // Pool C 1st place -- bye
+    { seed:3, team:'Scappoose' },     // Pool B 1st place
+    { seed:4, team:'Banks' },         // Pool A 2nd place
+    { seed:5, team:'Madras' },        // Pool B 2nd place
+    { seed:6, team:'Junction City' }  // Pool C 2nd place
+  ];
+  const silver = [
+    { seed:1, team:'La Pine' },       // Pool B 3rd place -- bye
+    { seed:2, team:'Molalla' },       // Pool C 3rd place -- bye
+    { seed:3, team:'South Umpqua' },  // Pool A 3rd place
+    { seed:4, team:'Philomath' },     // Pool B 4th place
+    { seed:5, team:'Ontario' },       // Pool C 4th place
+    { seed:6, team:'Gladstone' }      // Pool A 4th place
+  ];
   return { gold, silver };
 }
 function ensureBracketMatchIn(bm, slotKey){
@@ -543,10 +545,9 @@ new QRCode(document.getElementById('qrCode'), {
   correctLevel: QRCode.CorrectLevel.H
 });
 
-(async function init(){
+(function init(){
   render();
-  await pollData();
-  setInterval(pollData, 5000);
+  setUpdatedNow();
 })();
 </script>
 </body>
