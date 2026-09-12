@@ -179,6 +179,15 @@
   .btn-save:disabled{ cursor:default; }
   .btn-save.dirty{ background:var(--gold); cursor:pointer; animation:saveGlow 1.6s ease-in-out infinite; }
   @keyframes saveGlow{ 0%,100%{ box-shadow:0 0 0 0 rgba(232,116,158,0.5); } 50%{ box-shadow:0 0 0 8px rgba(232,116,158,0); } }
+
+  .credit-footer{
+    text-align:center; padding:20px 16px; margin-top:8px;
+    border-top:1px solid var(--line); font-size:12px; color:var(--sub);
+  }
+  .credit-footer strong{ color:var(--ink); }
+  .credit-footer a{ color:var(--gold); font-weight:600; text-decoration:none; }
+  .credit-footer a:hover{ text-decoration:underline; }
+  .credit-pitch{ margin-top:4px; }
 </style>
 </head>
 <body>
@@ -197,6 +206,11 @@
   <div class="footer-actions">
     <button class="btn btn-danger" id="resetBtn">Reset entire tournament</button>
   </div>
+  <footer class="credit-footer">
+    <strong>Tournament Sites by Micah Wilson</strong>
+    &middot; <a href="mailto:micahmariewilson@gmail.com">micahmariewilson@gmail.com</a>
+    <div class="credit-pitch">Want a live-scoring site like this one for your own tournament? Let&rsquo;s talk.</div>
+  </footer>
 </main>
 
 <div class="save-bar">

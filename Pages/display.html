@@ -188,6 +188,13 @@
     font-family:'Inter'; font-weight:700;
   }
   .rank-badge.silver{ background:#A0778A; }
+
+  .credit-footer{
+    flex-shrink:0; text-align:center; padding:4px 12px;
+    background:var(--navy); color:#CBA9B2; font-size:0.7vw;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .credit-footer a{ color:var(--gold); font-weight:600; text-decoration:none; }
 </style>
 </head>
 <body>
@@ -217,6 +224,10 @@
 </header>
 
 <main id="poolsGrid"></main>
+
+<footer class="credit-footer">
+  Tournament Sites by Micah Wilson &middot; <a href="mailto:micahmariewilson@gmail.com">micahmariewilson@gmail.com</a> &mdash; want a live-scoring site for your own tournament? Let&rsquo;s talk.
+</footer>
 
 <script>
 const POOLS = [
