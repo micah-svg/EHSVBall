@@ -105,7 +105,13 @@
   }
   header h1{ margin:0; font-size:19px; font-weight:600; }
   header .sub{ margin:4px 0 0 0; font-size:12px; color:#CBA9B2; }
-  main{ padding:16px; max-width:1400px; margin:0 auto; }
+  main{ padding:16px; max-width:1400px; margin:0 auto; display:flex; flex-direction:column; }
+  #status-banner{ order:0; }
+  #pool-block{ order:1; }
+  #bracket-block{ order:2; }
+  .footer-actions{ order:3; }
+  main.brackets-first #pool-block{ order:2; }
+  main.brackets-first #bracket-block{ order:1; }
   #pool-section{ display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; align-items:start; }
   #pool-section .court-card{ margin-bottom:0; }
   @media (max-width: 900px){
@@ -218,10 +224,14 @@
 
 <main>
   <div id="status-banner"></div>
-  <div class="section-label">Pool Play</div>
-  <div id="pool-section"></div>
-  <div class="section-label">Bracket Play</div>
-  <div id="bracket-section"></div>
+  <div id="pool-block">
+    <div class="section-label">Pool Play</div>
+    <div id="pool-section"></div>
+  </div>
+  <div id="bracket-block">
+    <div class="section-label">Bracket Play</div>
+    <div id="bracket-section"></div>
+  </div>
   <div class="footer-actions">
     <button class="btn btn-danger" id="resetBtn">Reset entire tournament</button>
   </div>
@@ -572,6 +582,7 @@ function renderPoolSection(){
 function renderStatusAndBracket(){
   const allPlayed = POOLS.every(p=> poolStandings(p).complete);
   const banner = document.getElementById('status-banner');
+  document.querySelector('main').classList.toggle('brackets-first', state.poolPlayComplete);
   if(!state.poolPlayComplete){
     banner.innerHTML = '<div class="status-banner pending">'+
       '<div class="status-text"><strong>Pool play in progress</strong>'+
