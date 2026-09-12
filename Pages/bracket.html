@@ -259,13 +259,13 @@ const COURT_COLORS = { 1:'#E8749E', 2:'#1D9A8C', 3:'#8B5FBF' };
 // while Aux Gym sits idle. Silver's first semifinal moves to Aux Gym once it frees up
 // after Gold's semifinal there — everything else stays on its original court.
 const COURT_TIMELINE = {
-  1: [['gold','qfA'], ['gold','sf1'], ['gold','final']],
-  2: [['gold','qfB'], ['gold','sf2'], ['silver','sf1'], ['silver','final']],
+  1: [['gold','qfA'], ['gold','sf1'], ['gold','final'], ['silver','final']],
+  2: [['gold','qfB'], ['gold','sf2'], ['silver','sf1']],
   3: [['silver','qfA'], ['silver','qfB'], ['silver','sf2']]
 };
 const SLOT_COURT = {
   gold:   { qfA:1, qfB:2, sf1:1, sf2:2, final:1 },
-  silver: { qfA:3, qfB:3, sf1:2, sf2:3, final:2 }
+  silver: { qfA:3, qfB:3, sf1:2, sf2:3, final:1 }
 };
 const GAME_ID = { qfA:1, qfB:2, sf1:3, sf2:4, final:5 };
 
@@ -323,33 +323,10 @@ function poolStandings(pool){
 }
 function getBracketSeeds(){
   const results = POOLS.map(p=> ({ pool:p.key, standings: poolStandings(p) }));
-  const findRank = (poolKey, rankNum) => results.find(r=>r.pool===poolKey).standings.find(s=>s.rank===rankNum);
+  const rankGroup = (rankNum)=> results.map(r=> r.standings.find(s=>s.rank===rankNum));
   const sortGroup = (group)=> group.slice().sort((a,b)=> b.wins-a.wins);
-  // Since seed 6 is always Pool B's mid-place team, seed 3 (its quarterfinal opponent)
-  // must never also be Pool B's — otherwise two Pool B teams would meet in round one.
-  // If Pool B's pool-winner would naturally rank weakest of the three (landing on seed
-  // 3), it's swapped up to seed 2 instead so a different pool's winner takes seed 3.
-  const avoidPoolBAtSeed3 = (topGroup, poolBTeam)=>{
-    if(topGroup[2] && topGroup[2].team === poolBTeam.team){
-      return [topGroup[0], topGroup[2], topGroup[1]];
-    }
-    return topGroup;
-  };
-
-  const goldTop = avoidPoolBAtSeed3(sortGroup(['A','B','C'].map(p=>findRank(p,1))), findRank('B',1));
-  // Pool A's and Pool C's 2nd-place teams always face each other in the quarterfinal
-  // (seeds 4 & 5 play each other); Pool B's 2nd-place team is always seed 6, paired
-  // against the weakest-eligible pool winner (seed 3) instead — regardless of strength.
-  const acGoldPair = sortGroup([findRank('A',2), findRank('C',2)]);
-  const goldMid = [...acGoldPair, findRank('B',2)];
-
-  const silverTop = avoidPoolBAtSeed3(sortGroup(['A','B','C'].map(p=>findRank(p,3))), findRank('B',3));
-  // Same rule for the Teal bracket's 4th-place finishers.
-  const acSilverPair = sortGroup([findRank('A',4), findRank('C',4)]);
-  const silverMid = [...acSilverPair, findRank('B',4)];
-
-  const gold = [...goldTop, ...goldMid].map((s,i)=> ({ seed:i+1, team:s.team }));
-  const silver = [...silverTop, ...silverMid].map((s,i)=> ({ seed:i+1, team:s.team }));
+  const gold = [...sortGroup(rankGroup(1)), ...sortGroup(rankGroup(2))].map((s,i)=> ({ seed:i+1, team:s.team }));
+  const silver = [...sortGroup(rankGroup(3)), ...sortGroup(rankGroup(4))].map((s,i)=> ({ seed:i+1, team:s.team }));
   return { gold, silver };
 }
 function ensureBracketMatchIn(bm, slotKey){
@@ -470,7 +447,7 @@ function workLineHtml(slotKey, x, y, work){
 }
 
 function renderBracketPanel(label, colorClass, bKey, seeds, st, work){
-  const courtNote = bKey==='gold' ? COURT_NAMES[1]+' &amp; '+COURT_NAMES[2] : COURT_NAMES[3]+' &amp; '+COURT_NAMES[2];
+  const courtNote = bKey==='gold' ? COURT_NAMES[1]+' &amp; '+COURT_NAMES[2] : COURT_NAMES[3]+', '+COURT_NAMES[2]+' &amp; '+COURT_NAMES[1];
 
   let html = '<div class="bracket-panel '+colorClass+'-accent">';
   html += '<div class="bracket-head '+colorClass+'"><h2>'+label+'</h2><span class="court-note">'+courtNote+'</span></div>';
