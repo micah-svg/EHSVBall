@@ -942,12 +942,12 @@ function getBracketSeeds(){
 // after Gold's semifinal there — everything else stays on its original court.
 const COURT_TIMELINE = {
   1: [['gold','qfA'], ['gold','sf1'], ['gold','final']],
-  2: [['gold','qfB'], ['gold','sf2'], ['silver','sf1']],
-  3: [['silver','qfA'], ['silver','qfB'], ['silver','sf2'], ['silver','final']]
+  2: [['gold','qfB'], ['gold','sf2'], ['silver','sf1'], ['silver','final']],
+  3: [['silver','qfA'], ['silver','qfB'], ['silver','sf2']]
 };
 const SLOT_COURT = {
   gold:   { qfA:1, qfB:2, sf1:1, sf2:2, final:1 },
-  silver: { qfA:3, qfB:3, sf1:2, sf2:3, final:3 }
+  silver: { qfA:3, qfB:3, sf1:2, sf2:3, final:2 }
 };
 // Game ID for OSAA reporting: numbered 1-5 within each bracket, in schedule order
 // (quarterfinals first, then semis, then the final).
