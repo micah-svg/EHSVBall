@@ -10,15 +10,20 @@
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js"></script>
 <script>
   // --- Shared live-score storage, backed by Firebase Realtime Database ---
-  // firebaseConfig is provided by Netlify's Snippet Injection at serve time (built from
-  // Post-processing-scoped environment variables) — see the setup notes wherever this
-  // project's deploy docs live. Locally, firebase-config.js (gitignored) can define the
-  // same global for testing. Init is lazy (getDb(), below) so it doesn't matter whether
-  // firebaseConfig is defined by an injected snippet, a local file, or anything else, as
-  // long as it exists by the time a save/load actually happens.
+  // Config lives right here, inline, in all four files (tournament.html, scorekeeper.html,
+  // display.html, bracket-display.html). If you ever rotate this key or move databases,
+  // update it in all four places.
+  const firebaseConfig = {
+    apiKey: "AIzaSyAX7YxKGh99GrBnyRftb0NL_wtL0bt7WXI",
+    authDomain: "ehs-volleyball.firebaseapp.com",
+    databaseURL: "https://ehs-volleyball-default-rtdb.firebaseio.com",
+    projectId: "ehs-volleyball",
+    storageBucket: "ehs-volleyball.firebasestorage.app",
+    messagingSenderId: "957400589340",
+    appId: "1:957400589340:web:32fa39dd4e23b69859ebd9"
+  };
   let _fbDb = null;
   function getDb(){
     if(_fbDb) return _fbDb;
@@ -513,9 +518,9 @@ function matchRowHtml(teamA, teamB, m, dataAttrs, extraNote){
   for(let si=0; si<3; si++){
     const s = (m.sets && m.sets[si]) ? m.sets[si] : {a:null,b:null};
     html += '<div class="set-input-pair"><span class="set-label">S'+(si+1)+'</span>'+
-      '<input type="number" min="0" max="99" inputmode="numeric" pattern="[0-9]*" '+dataAttrs+' data-set="'+si+'" data-side="a" value="'+(s.a??'')+'">'+
+      '<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" '+dataAttrs+' data-set="'+si+'" data-side="a" value="'+(s.a??'')+'">'+
       '<span>-</span>'+
-      '<input type="number" min="0" max="99" inputmode="numeric" pattern="[0-9]*" '+dataAttrs+' data-set="'+si+'" data-side="b" value="'+(s.b??'')+'">'+
+      '<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" '+dataAttrs+' data-set="'+si+'" data-side="b" value="'+(s.b??'')+'">'+
       '</div>';
   }
   html += '</div></div>';
@@ -609,25 +614,27 @@ document.addEventListener('input', (e)=>{
   const t = e.target;
   if(t.matches('input[data-target="pool"]')){
     const { pool, round, set, side } = t.dataset;
+    const digits = t.value.replace(/[^0-9]/g, '');
     const m = ensureMatch(pool, Number(round));
-    m.sets[Number(set)][side] = t.value === '' ? null : Number(t.value);
+    m.sets[Number(set)][side] = digits === '' ? null : Number(digits);
     markDirty();
     renderPoolSection();
     renderStatusAndBracket();
-    // restore focus so typing isn't interrupted by the re-render
+    // restore focus + cursor position so typing isn't interrupted by the re-render
     const sel = 'input[data-target="pool"][data-pool="'+pool+'"][data-round="'+round+'"][data-set="'+set+'"][data-side="'+side+'"]';
     const el = document.querySelector(sel);
-    if(el){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(err){ /* number inputs don't support text selection in some browsers */ } }
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
   }
   if(t.matches('input[data-target="bracket"]')){
     const { bkey, slot, set, side } = t.dataset;
+    const digits = t.value.replace(/[^0-9]/g, '');
     const m = ensureBracketMatch(bkey, slot);
-    m.sets[Number(set)][side] = t.value === '' ? null : Number(t.value);
+    m.sets[Number(set)][side] = digits === '' ? null : Number(digits);
     markDirty();
     renderStatusAndBracket();
     const sel = 'input[data-target="bracket"][data-bkey="'+bkey+'"][data-slot="'+slot+'"][data-set="'+set+'"][data-side="'+side+'"]';
     const el = document.querySelector(sel);
-    if(el){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(err){ /* number inputs don't support text selection in some browsers */ } }
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
   }
 });
 

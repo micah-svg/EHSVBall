@@ -10,15 +10,20 @@
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js"></script>
 <script>
   // --- Shared live-score storage, backed by Firebase Realtime Database ---
-  // firebaseConfig is provided by Netlify's Snippet Injection at serve time (built from
-  // Post-processing-scoped environment variables) — see the setup notes wherever this
-  // project's deploy docs live. Locally, firebase-config.js (gitignored) can define the
-  // same global for testing. Init is lazy (getDb(), below) so it doesn't matter whether
-  // firebaseConfig is defined by an injected snippet, a local file, or anything else, as
-  // long as it exists by the time a save/load actually happens.
+  // Config lives right here, inline, in all four files (tournament.html, scorekeeper.html,
+  // display.html, bracket-display.html). If you ever rotate this key or move databases,
+  // update it in all four places.
+  const firebaseConfig = {
+    apiKey: "AIzaSyAX7YxKGh99GrBnyRftb0NL_wtL0bt7WXI",
+    authDomain: "ehs-volleyball.firebaseapp.com",
+    databaseURL: "https://ehs-volleyball-default-rtdb.firebaseio.com",
+    projectId: "ehs-volleyball",
+    storageBucket: "ehs-volleyball.firebasestorage.app",
+    messagingSenderId: "957400589340",
+    appId: "1:957400589340:web:32fa39dd4e23b69859ebd9"
+  };
   let _fbDb = null;
   function getDb(){
     if(_fbDb) return _fbDb;
@@ -394,7 +399,7 @@ function renderBracketPanel(label, colorClass, bKey, seeds){
 function render(){
   const grid = document.getElementById('bracketsGrid');
   if(!state.poolPlayComplete){
-    grid.innerHTML = '<div class="bracket-panel"><div class="empty-msg">Waiting for pool play to be marked complete&hellip; brackets will appear here automatically.</div></div>'.repeat(2);
+    grid.innerHTML = '<div class="bracket-panel"><div class="empty-msg">Waiting for pool play to be marked complete&hellip; brackets will appear here automatically.<br><br>First bracket matches are estimated to begin around <strong>1:15 PM</strong>.</div></div>'.repeat(2);
     return;
   }
   const { gold, silver } = getBracketSeeds();

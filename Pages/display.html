@@ -10,15 +10,20 @@
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js"></script>
 <script>
   // --- Shared live-score storage, backed by Firebase Realtime Database ---
-  // firebaseConfig is provided by Netlify's Snippet Injection at serve time (built from
-  // Post-processing-scoped environment variables) — see the setup notes wherever this
-  // project's deploy docs live. Locally, firebase-config.js (gitignored) can define the
-  // same global for testing. Init is lazy (getDb(), below) so it doesn't matter whether
-  // firebaseConfig is defined by an injected snippet, a local file, or anything else, as
-  // long as it exists by the time a save/load actually happens.
+  // Config lives right here, inline, in all four files (tournament.html, scorekeeper.html,
+  // display.html, bracket-display.html). If you ever rotate this key or move databases,
+  // update it in all four places.
+  const firebaseConfig = {
+    apiKey: "AIzaSyAX7YxKGh99GrBnyRftb0NL_wtL0bt7WXI",
+    authDomain: "ehs-volleyball.firebaseapp.com",
+    databaseURL: "https://ehs-volleyball-default-rtdb.firebaseio.com",
+    projectId: "ehs-volleyball",
+    storageBucket: "ehs-volleyball.firebasestorage.app",
+    messagingSenderId: "957400589340",
+    appId: "1:957400589340:web:32fa39dd4e23b69859ebd9"
+  };
   let _fbDb = null;
   function getDb(){
     if(_fbDb) return _fbDb;
@@ -157,7 +162,7 @@
     gap:10px; padding:9px 0; border-bottom:1px solid var(--line); font-size:1.15vw;
   }
   .match-row:last-child{ border-bottom:none; }
-  .match-row .rd{ font-family:'Oswald'; color:var(--sub); font-size:0.9vw; width:2.2vw; }
+  .match-row .rd{ font-family:'Oswald'; color:var(--sub); font-size:0.85vw; width:4.6vw; white-space:nowrap; }
   .match-row .teams{ font-weight:600; overflow:hidden; }
   .match-row .teams .vs{ color:var(--sub); font-weight:400; font-size:0.9vw; padding:0 6px; }
   .match-row .teams .work{ font-weight:400; font-style:italic; color:var(--sub); font-size:0.8vw; margin-top:2px; }
@@ -252,6 +257,14 @@ function ensureMatch(pool,round){
   return state.matches[k];
 }
 
+// Round 1 starts at 9:00 AM; every round after that starts 45 minutes later.
+function roundTimeText(round){
+  const totalMins = 9*60 + (round-1)*45;
+  let h = Math.floor(totalMins/60), m = totalMins%60;
+  const ampm = h>=12 ? 'PM':'AM';
+  let h12 = h%12; if(h12===0) h12=12;
+  return h12+':'+String(m).padStart(2,'0')+' '+ampm;
+}
 function computeMatchResult(m, teamA, teamB){
   const status = m.status || (m.live ? 'live' : 'upcoming');
   let setsA=0,setsB=0,ptsA=0,ptsB=0;
@@ -334,7 +347,7 @@ function renderPoolColumn(pool){
     }
     const teamAHtml = (r.played && r.winner===teamA) ? '<span style="color:'+courtColor+'">'+teamA+'</span>' : teamA;
     const teamBHtml = (r.played && r.winner===teamB) ? '<span style="color:'+courtColor+'">'+teamB+'</span>' : teamB;
-    html += '<div class="match-row"><span class="rd">R'+round+'</span>'+
+    html += '<div class="match-row"><span class="rd">'+roundTimeText(round)+'</span>'+
       '<span class="teams">'+teamAHtml+'<span class="vs">vs</span>'+teamBHtml+'<div class="work">Work Team: '+workTeam+'</div></span>'+
       '<span style="text-align:right">'+statusHtml+'</span></div>';
   });
