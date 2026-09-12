@@ -388,15 +388,25 @@ function getBracketSeeds(){
   const results = POOLS.map(p=> ({ pool:p.key, ...poolStandings(p) }));
   const findRank = (poolKey, rankNum) => results.find(r=>r.pool===poolKey).standings.find(s=>s.rank===rankNum);
   const sortGroup = (group)=> group.slice().sort((a,b)=> b.wins-a.wins || b.setPct-a.setPct || b.ptPct-a.ptPct);
+  // Since seed 6 is always Pool B's mid-place team, seed 3 (its quarterfinal opponent)
+  // must never also be Pool B's — otherwise two Pool B teams would meet in round one.
+  // If Pool B's pool-winner would naturally rank weakest of the three (landing on seed
+  // 3), it's swapped up to seed 2 instead so a different pool's winner takes seed 3.
+  const avoidPoolBAtSeed3 = (topGroup, poolBTeam)=>{
+    if(topGroup[2] && topGroup[2].team === poolBTeam.team){
+      return [topGroup[0], topGroup[2], topGroup[1]];
+    }
+    return topGroup;
+  };
 
-  const goldTop = sortGroup(['A','B','C'].map(p=>findRank(p,1)));
+  const goldTop = avoidPoolBAtSeed3(sortGroup(['A','B','C'].map(p=>findRank(p,1))), findRank('B',1));
   // Pool A's and Pool C's 2nd-place teams always face each other in the quarterfinal
   // (seeds 4 & 5 play each other); Pool B's 2nd-place team is always seed 6, paired
-  // against the weakest pool winner (seed 3) instead — regardless of relative strength.
+  // against the weakest-eligible pool winner (seed 3) instead — regardless of strength.
   const acGoldPair = sortGroup([findRank('A',2), findRank('C',2)]);
   const goldMid = [...acGoldPair, findRank('B',2)];
 
-  const silverTop = sortGroup(['A','B','C'].map(p=>findRank(p,3)));
+  const silverTop = avoidPoolBAtSeed3(sortGroup(['A','B','C'].map(p=>findRank(p,3))), findRank('B',3));
   // Same rule for the Teal bracket's 4th-place finishers.
   const acSilverPair = sortGroup([findRank('A',4), findRank('C',4)]);
   const silverMid = [...acSilverPair, findRank('B',4)];
